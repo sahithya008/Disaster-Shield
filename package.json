@@ -1,7 +1,7 @@
 {
-  "name": "climate-shield",
+  "name": "disaster-shield",
   "version": "1.0.0",
-  "description": "Static frontend for Climate Shield project",
+  "description": "Static frontend for Disaster Shield project",
   "main": "index.html",
   "scripts": {
     "dev": "npx http-server Frontend -c-1"

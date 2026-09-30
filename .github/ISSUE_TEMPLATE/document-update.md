@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-<!-- Thank you for contributing to Climate-Shield -->
+<!-- Thank you for contributing to Disaster-Shield -->
 
 ## Description
 <!-- Clearly describe the documentation issue, improvement, or new content suggestion. -->

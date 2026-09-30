@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chip.textContent = item.label;
         
         //Issue #67: Accessibility improvement: Tell screen readers what clicking this chip does
-        chip.setAttribute('aria-label', `Ask ClimateBot about ${item.label.split(' ').slice(1).join(' ')}`);
+        chip.setAttribute('aria-label', `Ask Disaster Shield about ${item.label.split(' ').slice(1).join(' ')}`);
         
         chip.style.background = 'rgba(255, 255, 255, 0.08)';
         chip.style.border = '1px solid rgba(255, 255, 255, 0.12)';
@@ -201,38 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
         appendChatMessage(messages, message, 'user', true);
         input.value = '';
 
-        setChatStatus(status, 'ClimateBot is thinking...');
-
-        // Local Context Interception
-        const lowerMsg = message.toLowerCase();
-        const activeReport = window.activeClimateReport;
-        
-        if (activeReport && (
-            lowerMsg.includes("here") || 
-            lowerMsg.includes("current") || 
-            lowerMsg.includes("this") || 
-            lowerMsg.includes("summary") || 
-            lowerMsg.includes(activeReport.location.city.toLowerCase())
-        )) {
-            // Serve dynamic, context-aware answers instantly on the client side!
-            setTimeout(() => {
-                let responseText = `Here is the current weather & risk summary for ${activeReport.location.city}:\n\n`;
-                responseText += `🌡️ Temp: ${activeReport.weather.temperature} °C | 💧 Humid: ${activeReport.weather.humidity}%\n`;
-                responseText += `🌧️ Rain: ${activeReport.weather.rainfall} mm | 🌪️ Wind: ${activeReport.weather.wind_speed} km/h\n\n`;
-                responseText += `⚠️ Hazard Risk Ratings (Scale 0-1.0):\n`;
-                responseText += `- Flood Risk: ${activeReport.risks.flood_risk} (Threshold: 0.65)\n`;
-                responseText += `- Heat Risk: ${activeReport.risks.heat_risk} (Threshold: 0.75)\n`;
-                responseText += `- Wildfire Risk: ${activeReport.risks.wildfire_risk} (Threshold: 0.65)\n`;
-                responseText += `- Cyclone Risk: ${activeReport.risks.cyclone_risk} (Threshold: 0.60)\n`;
-                responseText += `- Drought Risk: ${activeReport.risks.drought_risk} (Threshold: 0.70)\n\n`;
-                responseText += `📢 Current Advisory Alert:\n`;
-                responseText += activeReport.alerts.map(a => `${a}`).join('\n');
-                
-                appendChatMessage(messages, responseText, 'bot', true);
-                setChatStatus(status, '');
-            }, 550);
-            return;
-        }
+        setChatStatus(status, 'Disaster Shield is thinking...');
 
         try {
             const response = await fetch(CHATBOT_API_URL, {
@@ -243,6 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body: JSON.stringify({
                     message,
                     context: window.lastAnalysisContext || null,
+                    history: globalChatHistory.slice(0, -1).slice(-12),
                 })
             });
 

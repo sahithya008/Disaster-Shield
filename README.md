@@ -1,4 +1,4 @@
-# 🌍 Climate Shield
+# 🌍 Disaster Shield
 
 AI-driven real-time climate risk analysis platform for detecting flood and heatwave threats using live weather intelligence.
 
@@ -11,13 +11,13 @@ AI-driven real-time climate risk analysis platform for detecting flood and heatw
 
 # 🚀 Live Demo
 
-🌐 https://climate-shield.onrender.com
+🌐 https://disaster-shield.onrender.com
 
 ---
 
 # 📌 Overview
 
-Climate Shield is a lightweight climate intelligence platform that combines:
+Disaster Shield is a lightweight climate intelligence platform that combines:
 
 - 🌦 Real-time weather monitoring
 - ⚠ Flood and heatwave risk analysis
@@ -45,7 +45,7 @@ and instantly receive:
 
 ## 🌦 Real-Time Weather Monitoring
 
-Climate Shield fetches live weather data using the OpenWeatherMap API and displays:
+Disaster Shield fetches live weather data using the OpenWeatherMap API and displays:
 
 - Temperature
 - Humidity
@@ -87,7 +87,7 @@ The platform automatically generates alerts such as:
 
 ## 🤖 ClimateBot AI Assistant
 
-Climate Shield includes an integrated AI chatbot that provides:
+Disaster Shield includes an integrated AI chatbot that provides:
 
 - Flood awareness
 - Heatwave precautions
@@ -165,7 +165,7 @@ Climate Alerts & Chatbot
 # 📂 Project Structure
 
 ```bash
-Climate-Shield/
+Disaster-Shield/
 ├── AI-chatbot/
 │   └── chatbot.py
 │
@@ -207,8 +207,8 @@ Make sure you have the following installed before setup:
 ## 1️⃣ Clone Repository
 
 ```bash
-git clone https://github.com/thetechguardians/Climate-Shield.git
-cd Climate-Shield
+git clone https://github.com/thetechguardians/Disaster-Shield.git
+cd Disaster-Shield
 ```
 
 ---
@@ -425,7 +425,7 @@ This project is licensed under the MIT License.
 
 # 👨‍💻 Authors
 
-Developed by Team Climate Shield.
+Developed by Team Disaster Shield.
 
 - [@Vikrant0207](https://github.com/Vikrant0207)
 
@@ -435,8 +435,8 @@ Developed by Team Climate Shield.
 
 ### 🆘 Need Help?
 
-- 💬 **Discussions**:   [GitHub Discussions](https://github.com/thetechguardians/Climate-Shield/discussions)
-- 🐛 **Bug Reports**:   [Open an Issue](https://github.com/thetechguardians/Climate-Shield/issues)
+- 💬 **Discussions**:   [GitHub Discussions](https://github.com/thetechguardians/Disaster-Shield/discussions)
+- 🐛 **Bug Reports**:   [Open an Issue](https://github.com/thetechguardians/Disaster-Shield/issues)
 - 📧 **Discord**:       [Join Discord Server](https://discord.gg/VH5MVsFdJF)
 
 ### 🌟 Stay Connected
@@ -448,7 +448,7 @@ Developed by Team Climate Shield.
 
 # 🌍 Vision
 
-Climate Shield aims to make climate risk awareness:
+Disaster Shield aims to make climate risk awareness:
 
 - Fast
 - Accessible

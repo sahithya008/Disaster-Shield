@@ -278,18 +278,18 @@ body.light-mode .navbar {
 
 .cs-hero-widget-shell {
   position: relative;
-  min-height: 420px;
+  min-height: 350px;
   width: 100%;
-  max-width: 400px;
+  max-width: 360px;
 }
 
 .cs-hero-widget-card {
   position: absolute;
   top: 0;
   right: 0;
-  width: 260px;
-  height: 260px;
-  padding: 24px;
+  width: 200px;
+  height: 200px;
+  padding: 20px;
   border-radius: 24px;
   background: rgba(15, 23, 42, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -307,28 +307,28 @@ body.light-mode .navbar {
   top: 30px;
   right: 16px;
   z-index: 3;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   background: rgba(14, 165, 233, 0.16);
 }
 
 .cs-hero-widget-card--mid {
-  top: 130px;
+  top: 105px;
   left: 14px;
   right: auto;
   z-index: 2;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   background: rgba(16, 185, 129, 0.16);
 }
 
 .cs-hero-widget-card--bottom {
-  top: 250px;
+  top: 200px;
   right: 16px;
   left: auto;
   z-index: 1;
-  width: 220px;
-  height: 220px;
+  width: 180px;
+  height: 180px;
   background: rgba(249, 115, 22, 0.16);
 }
 
@@ -368,7 +368,7 @@ body.light-mode .navbar {
 }
 
 .cs-hero-widget-weather-icon svg {
-  width: 120px;
+  width: 96px;
   height: auto;
 }
 
@@ -391,7 +391,7 @@ body.light-mode .navbar {
 .cs-hero-widget-gauge {
   position: relative;
   width: 100%;
-  height: 88px;
+  height: 68px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   overflow: hidden;
@@ -452,8 +452,8 @@ body.light-mode .navbar {
   display: grid;
   place-items: center;
   margin-top: 14px;
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   animation: cs-alert-pulse 1.8s ease-in-out infinite;
 }
 
@@ -525,7 +525,7 @@ body.light-mode .navbar {
   }
 
   .cs-hero-widget-shell {
-    max-width: 460px;
+    max-width: 400px;
   }
 }
 
@@ -544,10 +544,10 @@ body.light-mode .navbar {
     top: auto;
     transform: none;
     width: 100%;
-    max-width: 320px;
+    max-width: 280px;
     height: auto;
     margin: 0 auto 18px;
-    padding: 22px;
+    padding: 18px;
     border-radius: 28px;
   }
 
@@ -1324,4 +1324,126 @@ body.light-mode .navbar {
 .scroll-top-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(14, 165, 233, 0.45);
+}
+/* Keep the hero widgets in a clear, responsive grid instead of overlapping. */
+.cs-hero-widget-shell {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  width: min(100%, 400px);
+  max-width: none;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.cs-hero-widget-card,
+.cs-hero-widget-card--top,
+.cs-hero-widget-card--mid,
+.cs-hero-widget-card--bottom {
+  position: relative;
+  inset: auto;
+  width: auto;
+  max-width: none;
+  height: auto;
+  min-width: 0;
+  min-height: 168px;
+  margin: 0;
+  padding: 18px;
+  border-radius: 22px;
+}
+
+.cs-hero-widget-card--top {
+  grid-column: 1 / -1;
+  min-height: 156px;
+  grid-template-columns: minmax(0, 1fr) 112px;
+  grid-template-rows: auto 1fr;
+  justify-items: stretch;
+  text-align: left;
+}
+
+.cs-hero-widget-card--top .cs-hero-widget-heading {
+  grid-column: 1;
+  grid-row: 1;
+  margin-bottom: 0;
+}
+
+.cs-hero-widget-card--top .cs-hero-widget-weather-icon {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  margin: 0;
+}
+
+.cs-hero-widget-card--top .cs-hero-widget-weather-icon svg {
+  width: 100px;
+}
+
+.cs-hero-widget-card--top .cs-hero-widget-temp {
+  grid-column: 1;
+  grid-row: 2;
+  gap: 0;
+}
+
+.cs-hero-widget-card--mid,
+.cs-hero-widget-card--bottom {
+  position: relative;
+  text-align: center;
+}
+
+.cs-hero-widget-card--mid .cs-hero-widget-gauge {
+  height: 48px;
+}
+
+.cs-hero-widget-card--bottom .cs-hero-widget-alert-icon {
+  width: 48px;
+  height: 48px;
+  margin: 8px auto 0;
+}
+
+@media (max-width: 980px) {
+  .cs-hero-widget-shell {
+    width: min(100%, 560px);
+    max-width: none;
+    min-height: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .cs-hero-widget-shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .cs-hero-widget-card,
+  .cs-hero-widget-card--top,
+  .cs-hero-widget-card--mid,
+  .cs-hero-widget-card--bottom {
+    min-height: 140px;
+    padding: 18px;
+  }
+
+  .cs-hero-widget-card--top {
+    grid-column: auto;
+    min-height: 136px;
+    grid-template-columns: minmax(0, 1fr) 88px;
+  }
+
+  .cs-hero-widget-card--top .cs-hero-widget-weather-icon svg {
+    width: 82px;
+  }
+}
+
+@media (min-width: 981px) {
+  .cs-hero-widget {
+    margin-top: 160px;
+  }
+}
+
+@media (max-width: 980px) {
+  .cs-hero-widget {
+    margin-top: 0;
+  }
+}
+/* Keep the fixed navigation above the floating hero status cards. */
+.page-shell > .navbar {
+  z-index: 20;
 }

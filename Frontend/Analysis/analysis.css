@@ -1158,7 +1158,7 @@ button:hover {
   border-color: rgba(234, 179, 8, 0.48);
 }
 
-/* 5-DAY FORECAST SECTION */
+/* 7-DAY FORECAST SECTION */
 .forecast-section {
   margin-top: 32px;
   border-top: 1px solid var(--border-color);
@@ -1172,9 +1172,35 @@ button:hover {
   font-size: 0.9rem;
 }
 
+.forecast-summary {
+  margin: 0 0 18px;
+  padding: 14px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: rgba(56, 189, 248, 0.08);
+  color: var(--text-primary);
+  line-height: 1.55;
+}
+
+.forecast-attribution {
+  margin: 0 0 16px;
+  color: var(--muted-2);
+  font-size: 0.78rem;
+}
+
+.forecast-attribution a {
+  color: #7dd3fc;
+}
+
+.forecast-condition {
+  color: var(--muted-2);
+  font-size: 0.78rem;
+  min-height: 1.2em;
+}
+
 .forecast-cards-container {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   margin-bottom: 24px;
 }

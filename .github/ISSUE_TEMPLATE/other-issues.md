@@ -7,7 +7,7 @@ assignees: ''
 
 ---
 
-<!-- Thanks for contributing to Climate-Shield -->
+<!-- Thanks for contributing to Disaster-Shield -->
 
 ## Description
 <!-- Clearly describe your question, suggestion, concern, or discussion topic. -->

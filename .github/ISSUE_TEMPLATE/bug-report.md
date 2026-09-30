@@ -7,7 +7,7 @@ assignees: thetechguardians
 
 ---
 
-<!-- Thank you for taking the time to contribute in Climate-Shield! 🙌 -->
+<!-- Thank you for taking the time to contribute in Disaster-Shield! 🙌 -->
 
 
 # Description

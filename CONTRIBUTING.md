@@ -1,6 +1,6 @@
-# 🤝 Contributing to Climate Shield
+# 🤝 Contributing to Disaster Shield
 
-Thank you for your interest in contributing to **Climate Shield**.
+Thank you for your interest in contributing to **Disaster Shield**.
 
 We welcome contributions that improve:
 
@@ -35,9 +35,9 @@ Click the **Fork** button on GitHub.
 ## 2️⃣ Clone Your Fork
 
 ```bash id="8u8e6g"
-git clone https://github.com/your-username/Climate-Shield.git
+git clone https://github.com/your-username/Disaster-Shield.git
 
-cd Climate-Shield
+cd Disaster-Shield
 ```
 
 ---
@@ -87,7 +87,7 @@ https://openweathermap.org/api
 # 📂 Project Structure
 
 ```bash id="c5kz4k"
-Climate-Shield/
+Disaster-Shield/
 ├── AI-chatbot/
 ├── backend/
 ├── Frontend/
@@ -236,7 +236,7 @@ You can contribute:
 
 # 🌍 Vision
 
-Climate Shield aims to make climate awareness:
+Disaster Shield aims to make climate awareness:
 
 * accessible
 * intelligent
@@ -249,6 +249,6 @@ Your contributions help improve disaster preparedness and climate awareness for 
 
 # ⭐ Thank You
 
-Thank you for supporting Climate Shield. Please Star the repo
+Thank you for supporting Disaster Shield. Please Star the repo
 
 Together we can build smarter climate resilience systems.

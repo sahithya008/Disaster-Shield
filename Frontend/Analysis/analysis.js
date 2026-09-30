@@ -185,7 +185,6 @@ async function getWeatherData() {
   const alertBox = document.getElementById("alert-box");
   const resultStatus = document.getElementById("result-status");
   const resultSummary = document.getElementById("result-summary");
-  const statusPill = document.getElementById("status-pill");
   const analyzeBtn = document.getElementById("analyze-btn");
   const demoIndicator = document.getElementById("demo-mode-indicator");
   const dispatchLogsBox = document.getElementById("dispatch-logs-box");
@@ -333,7 +332,7 @@ async function getWeatherData() {
 
     recommendationsPanel.classList.remove("hidden");
 
-    // Store last analysis result so ClimateBot can use it
+    // Store last analysis result so Disaster Shield Assistant can use it
     window.lastAnalysisContext = {
       location: {
         city: city,
@@ -353,6 +352,9 @@ async function getWeatherData() {
         cyclone_risk: data.risks.cyclone_risk,
         drought_risk: data.risks.drought_risk,
       },
+      alerts: Array.isArray(data.alerts) ? data.alerts : [],
+      forecast_summary: data.forecast_summary || "",
+      forecast: Array.isArray(data.forecast) ? data.forecast : [],
     };
 
     // Update chatbot context badge if it exists
@@ -458,14 +460,16 @@ async function getWeatherData() {
         mapMarker.openPopup();
       });
 
-    // Render 5-Day Forecast
+    // Render 7-Day Forecast
     const forecastContainer = document.getElementById(
       "forecast-cards-container",
     );
     forecastContainer.innerHTML = "";
+    const forecastSummary = document.getElementById("forecast-summary");
+    if (forecastSummary) forecastSummary.textContent = data.forecast_summary || "7-day forecast summary is unavailable.";
 
     data.forecast.forEach((day) => {
-      const dateObj = new Date(day.date);
+      const dateObj = new Date(`${day.date}T12:00:00`);
       const formattedDate = dateObj.toLocaleDateString("en-US", {
         weekday: "short",
         month: "short",
@@ -501,11 +505,12 @@ async function getWeatherData() {
       card.className = "forecast-card";
       card.innerHTML = `
     <div class="forecast-date">${formattedDate}</div>
-    <div class="forecast-temp">${day.temperature} °C</div>
+    <div class="forecast-temp">${day.temperature_min}-${day.temperature_max} &#176;C</div>
+    <div class="forecast-condition">${day.condition || "Daily outlook"}</div>
 
     <div class="forecast-details">
         <span>💧 Humid: ${day.humidity}%</span>
-        <span>🌧 Rain: ${day.rainfall} mm</span>
+        <span>Rain: ${day.rainfall} mm; rain chance: ${day.rain_probability ?? "unknown"}%</span>
         <span>🌪 Wind: ${day.wind_speed} km/h</span>
     </div>
 
@@ -526,7 +531,7 @@ async function getWeatherData() {
 
     // Initialize / Update Charts
     const forecastLabels = data.forecast.map((day) => {
-      const dateObj = new Date(day.date);
+      const dateObj = new Date(`${day.date}T12:00:00`);
       return dateObj.toLocaleDateString("en-US", {
         month: "short",
         day: "numeric",
@@ -552,13 +557,33 @@ async function getWeatherData() {
             yAxisID: "yRain",
           },
           {
-            label: "Temperature (°C)",
+            label: "Mean temperature (\u00b0C)",
             data: data.forecast.map((day) => day.temperature),
             type: "line",
             borderColor: "#ef4444",
             backgroundColor: "rgba(239, 68, 68, 0.1)",
             tension: 0.35,
-            fill: true,
+            fill: false,
+            yAxisID: "yTemp",
+          },
+          {
+            label: "Daily high (\u00b0C)",
+            data: data.forecast.map((day) => day.temperature_max),
+            type: "line",
+            borderColor: "#fb923c",
+            borderDash: [5, 4],
+            pointRadius: 2,
+            tension: 0.3,
+            yAxisID: "yTemp",
+          },
+          {
+            label: "Daily low (\u00b0C)",
+            data: data.forecast.map((day) => day.temperature_min),
+            type: "line",
+            borderColor: "#60a5fa",
+            borderDash: [5, 4],
+            pointRadius: 2,
+            tension: 0.3,
             yAxisID: "yTemp",
           },
         ],
@@ -757,7 +782,6 @@ async function getWeatherData() {
     resultStatus.innerText = "Climate analysis completed";
     resultSummary.innerText =
       "Live weather and risk analysis generated successfully.";
-    statusPill.innerText = "Analysis Complete";
   } catch (error) {
     console.error(error);
     loading.classList.add("hidden");

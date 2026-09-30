@@ -4,7 +4,8 @@ import requests
 
 from dotenv import load_dotenv
 
-load_dotenv()
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(PROJECT_ROOT, '.env'))
 
 GIS_ALERTS_URL = os.environ.get("GIS_ALERTS_URL", "https://example.com/gis/alerts")
 
@@ -197,6 +198,24 @@ def fetch_gis_alert_data():
 # WEATHER API
 # =========================================================
 
+def weather_condition_from_code(code):
+    if code == 0:
+        return "Clear sky"
+    if code in (1, 2, 3):
+        return "Mainly clear to overcast"
+    if code in (45, 48):
+        return "Fog"
+    if code in (51, 53, 55, 56, 57):
+        return "Drizzle"
+    if code in (61, 63, 65, 66, 67, 80, 81, 82):
+        return "Rain showers"
+    if code in (71, 73, 75, 77, 85, 86):
+        return "Snow"
+    if code in (95, 96, 99):
+        return "Thunderstorm"
+    return "Variable conditions"
+
+
 @app.route("/weather", methods=["POST"])
 def get_weather_insights():
 
@@ -222,7 +241,7 @@ def get_weather_insights():
 
             return jsonify({
                 "success": False,
-                "message": "Weather service configuration error."
+                "message": "Weather service is not configured. Set OPENWEATHER_API_KEY in the project root .env file and restart the backend."
             }), 500
 
 # ----------------------------------------------------
@@ -289,20 +308,30 @@ def get_weather_insights():
         # STEP 3: Forecast
         # ----------------------------------------------------
 
+        # Open-Meteo supplies actual daily aggregates for a full 7-day outlook.
+        # The current conditions above remain sourced from OpenWeather.
         forecast_response = requests.get(
-            "https://api.openweathermap.org/data/2.5/forecast",
+            "https://api.open-meteo.com/v1/forecast",
             params={
-                "lat": lat,
-                "lon": lon,
-                "units": "metric",
-                "appid": api_key
+                "latitude": lat,
+                "longitude": lon,
+                "timezone": "auto",
+                "forecast_days": 7,
+                "daily": ",".join((
+                    "weather_code",
+                    "temperature_2m_max",
+                    "temperature_2m_min",
+                    "temperature_2m_mean",
+                    "relative_humidity_2m_mean",
+                    "precipitation_sum",
+                    "precipitation_probability_max",
+                    "wind_speed_10m_max",
+                )),
             },
             timeout=15
         )
-
         forecast_response.raise_for_status()
-
-        forecast_data = forecast_response.json()
+        forecast_data = forecast_response.json().get("daily", {})
 
         # ----------------------------------------------------
         # RISK CALCULATIONS
@@ -406,85 +435,63 @@ def get_weather_insights():
         # ----------------------------------------------------
 
         forecast = []
+        daily_fields = forecast_data
+        daily_dates = daily_fields.get("time", [])
 
-        forecast_items = forecast_data.get("list", [])
+        def daily_value(field, index, default=0):
+            values = daily_fields.get(field) or []
+            value = values[index] if index < len(values) else default
+            return default if value is None else value
 
-        for item in forecast_items[::8][:5]:
+        for index, forecast_date in enumerate(daily_dates[:7]):
+            day_temp = float(daily_value("temperature_2m_mean", index))
+            day_temp_min = float(daily_value("temperature_2m_min", index, day_temp))
+            day_temp_max = float(daily_value("temperature_2m_max", index, day_temp))
+            day_humidity = float(daily_value("relative_humidity_2m_mean", index))
+            day_rain = float(daily_value("precipitation_sum", index))
+            day_wind = float(daily_value("wind_speed_10m_max", index))
+            day_rain_chance = float(daily_value("precipitation_probability_max", index))
 
-            day_temp = item["main"]["temp"]
-            day_humidity = item["main"]["humidity"]
-
-            day_rain = (
-                item.get("rain", {})
-                .get("3h", 0)
-            )
-
-            day_wind = round(
-                item["wind"]["speed"] * 3.6,
-                1
-            )
-
+            day_risks = {
+                "flood_risk": round(min(1.0, (day_rain * 0.6 + day_humidity * 0.3 + day_wind * 0.1) / 100), 3),
+                "heat_risk": round(min(1.0, (max(day_temp_max - 25, 0) * 2 + day_humidity * 0.3) / 100), 3),
+                "wildfire_risk": round(min(1.0, (max(day_temp_max - 32, 0) * 1.5 + (100 - day_humidity) * 0.5 + day_wind * 0.2) / 100), 3),
+                "cyclone_risk": round(min(1.0, (day_wind * 1.5 + day_rain * 0.5) / 100), 3),
+                "drought_risk": round(min(1.0, (max(day_temp_max - 28, 0) + (100 - day_humidity)) / 100), 3),
+            }
+            code = int(daily_value("weather_code", index, 0))
             forecast.append({
-                "date": item["dt_txt"],
+                "date": forecast_date,
                 "temperature": round(day_temp, 1),
-                "humidity": day_humidity,
+                "temperature_min": round(day_temp_min, 1),
+                "temperature_max": round(day_temp_max, 1),
+                "humidity": round(day_humidity),
                 "rainfall": round(day_rain, 1),
-                "wind_speed": day_wind,
-                "risks": {
-                    "flood_risk": round(
-                        min(
-                            1.0,
-                            (
-                                day_rain * 0.6 +
-                                day_humidity * 0.3 +
-                                day_wind * 0.1
-                            ) / 100
-                        ),
-                        3
-                    ),
-                    "heat_risk": round(
-                        min(
-                            1.0,
-                            (
-                                max(day_temp - 25, 0) * 2 +
-                                day_humidity * 0.3
-                            ) / 100
-                        ),
-                        3
-                    ),
-                    "wildfire_risk": round(
-                        min(
-                            1.0,
-                            (
-                                max(day_temp - 32, 0) * 1.5 +
-                                (100 - day_humidity) * 0.5 +
-                                day_wind * 0.2
-                            ) / 100
-                        ),
-                        3
-                    ),
-                    "cyclone_risk": round(
-                        min(
-                            1.0,
-                            (
-                                day_wind * 1.5 +
-                                day_rain * 0.5
-                            ) / 100
-                        ),
-                        3
-                    ),
-                    "drought_risk": round(
-                        min(
-                            1.0,
-                            (
-                                max(day_temp - 28, 0) +
-                                (100 - day_humidity)
-                            ) / 100
-                        ),
-                        3
-                    )
-                }
+                "rain_probability": round(day_rain_chance),
+                "wind_speed": round(day_wind, 1),
+                "condition": weather_condition_from_code(code),
+                "risks": day_risks,
             })
+
+        risk_names = {
+            "flood_risk": "flood",
+            "heat_risk": "heat",
+            "wildfire_risk": "wildfire",
+            "cyclone_risk": "cyclone",
+            "drought_risk": "drought",
+        }
+        peak = max(
+            ((score, risk_names[name], day["date"]) for day in forecast for name, score in day["risks"].items()),
+            default=(0, "climate", "the coming week"),
+        )
+        wettest = max(forecast, key=lambda day: day["rainfall"], default=None)
+        hottest = max(forecast, key=lambda day: day["temperature_max"], default=None)
+        forecast_summary = (
+            f"7-day outlook: {len(forecast)} days available. "
+            + (f"Wettest day is {wettest['date']} with {wettest['rainfall']} mm precipitation. " if wettest else "")
+            + (f"Warmest high is {hottest['temperature_max']} \u00b0C on {hottest['date']}. " if hottest else "")
+            + (f"Highest modeled daily hazard is {peak[1]} ({round(peak[0] * 100)}%) on {peak[2]}." if forecast else "No daily forecast data was returned.")
+        )
 
         return jsonify({
 
@@ -524,6 +531,8 @@ def get_weather_insights():
             },
 
             "forecast": forecast,
+            "forecast_summary": forecast_summary,
+            "forecast_source": "Open-Meteo",
 
             "alerts": calculated_alerts,
         })
@@ -628,7 +637,7 @@ def city_suggestions():
                 "countrycodes": "in"
             },
             headers={
-                "User-Agent": "ClimateShield/1.0"
+                "User-Agent": "DisasterShield/1.0"
             },
             timeout=10
         )
