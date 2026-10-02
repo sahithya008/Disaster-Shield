@@ -254,9 +254,11 @@ Create a `.env` file in the root directory:
 
 ```env
 OPENWEATHER_API_KEY=your_api_key_here
+FLASK_SECRET_KEY=generate_a_long_random_secret
 ```
 
 Get your free API key from the [OpenWeatherMap API](https://openweathermap.org/api).
+Accounts use email and a password of at least 10 characters. Keep `FLASK_SECRET_KEY` private and stable; changing it logs all users out. The project `.env` already has a generated local key. For HTTPS deployments, set `SESSION_COOKIE_SECURE=true` and configure `FRONTEND_ORIGINS` to the exact frontend origins. If frontend and API are on different sites, set `SESSION_COOKIE_SAMESITE=None` as well. Existing subscriptions must be saved again after an account is created so they are attached to that account.
 
 ---
 
@@ -272,7 +274,7 @@ Backend runs on:
 http://127.0.0.1:5000
 ```
 
-The Flask backend also serves the frontend, so you can open `http://127.0.0.1:5000` in your browser after the server starts.
+The Flask backend serves the frontend, so open `http://127.0.0.1:5000` and create an account or log in. Weather analysis, chatbot, subscriptions, and notification logs require a signed-in account.
 
 ---
 
@@ -284,18 +286,14 @@ Recommended local URL:
 http://127.0.0.1:5000
 ```
 
-You can also open the static frontend directly:
+If you serve the frontend separately for development, keep the Flask backend running and use an allowed local origin (including VS Code Live Server on port 5500):
 
 ```text
-Frontend/index.html
-```
-
-or serve it locally:
-
-```bash
 cd Frontend
 python -m http.server 8000
 ```
+
+Then open `http://127.0.0.1:8000`. Opening the HTML file directly with `file://` is not supported because account sessions require HTTP cookies.
 
 ---
 
@@ -396,7 +394,7 @@ Add the following environment variable in the Render dashboard:
 
 - 🌧 Rain prediction forecasting
 - 📍 Interactive GIS climate maps
-- 📲 SMS / Email emergency alerts
+- 📲 Telegram / Email emergency alerts
 - 🛰 Satellite weather integration
 - 🧠 Machine learning risk prediction
 - 🌎 Multi-language support
@@ -470,4 +468,28 @@ If this project helped you, please consider:
 - 🛠 **Contribute** improvements
 
 ---
-"# Disaster-Shield" 
+"# Disaster-Shield"
+
+## Real IMD notifications (local setup)
+
+The alert section now stores district subscriptions in a local SQLite database and reads official IMD district warnings, subdivision warnings, and district nowcasts. Run both backend processes in separate Command Prompt windows:
+
+```bat
+venv\Scripts\activate.bat
+python backend\alertsystem.py
+```
+
+```bat
+venv\Scripts\activate.bat
+python backend\notification_worker.py
+```
+
+The notification worker polls every five minutes by default. Register with the [IMD API portal](https://api.imd.gov.in/public/index.php), obtain access, and fill `IMD_API_KEY` in the project `.env`. The portal's credential header format must match `IMD_API_AUTH_HEADER` and `IMD_API_AUTH_PREFIX`; defaults are `Authorization` and `Bearer`. If IMD provides an `X-API-Key` style key, set the header to `X-API-Key` and clear the prefix. The worker status is shown under the subscription form.
+
+Dashboard warnings work once the IMD feed is authorized and the worker is running. Email requires valid SMTP settings (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`). Telegram requires `TELEGRAM_BOT_TOKEN` from BotFather. Users must start a chat with your bot and provide their Telegram chat ID. Leave a channel unchecked until its provider is configured. Email and Telegram failures are recorded in the dispatch log and retried up to five times.
+
+When a new subscription has Email selected, Disaster Shield emails the first location analysis at signup and schedules another analysis every five days. The worker also sends matching official IMD warning emails as they arrive (it polls every five minutes by default). After a subscription is saved in a browser, each successful location search in that browser emails the analysis to that active subscription email, even when the searched location differs from the subscribed location. Search reports require Email to be selected and valid SMTP settings. Keep `backend/notification_worker.py` running for recurring reports and official alert delivery.
+
+On a contact's first subscription for a district and state, Disaster Shield attempts a signup confirmation by both email and Telegram, independently of the selected channels for future warning alerts. A Telegram chat ID is required. Create a bot with Telegram's BotFather, set `TELEGRAM_BOT_TOKEN` in `.env`, start the bot from your Telegram account, and obtain your chat ID (for example, from the bot's `getUpdates` response after sending it a message). The signup remains saved if one or both providers are unavailable, and the response reports the confirmation status. Re-submitting an existing email/district/state subscription updates its preferences without sending another signup confirmation.
+
+This is a local prototype using SQLite. Before a public deployment, use shared persistent storage for subscriptions and delivery records, verify email/Telegram ownership, add rate limiting and a real unsubscribe flow, and keep provider credentials in the host's secret manager. IMD warning severities are taken from IMD feed color codes; Disaster Shield's model-based risk scores remain separate advisories.

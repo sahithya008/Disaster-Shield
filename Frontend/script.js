@@ -74,7 +74,7 @@ function resolveApiUrl(){
 
     // Local dev fallback.
     if (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost") {
-        return "http://127.0.0.1:5000/weather";
+        return `${window.location.protocol}//${window.location.hostname}:5000/weather`;
     }
 
 
@@ -108,6 +108,7 @@ async function getWeatherData() {
             API_URL,
             {
                 method: "POST",
+                credentials: "include",
                 headers: {
                     "Content-Type": "application/json"
                 },

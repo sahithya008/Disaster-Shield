@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Disaster Shield | Account</title>
+  <link rel="stylesheet" href="auth.css">
+  <script src="auth.js" defer></script>
+</head>
+<body>
+  <main class="auth-shell">
+    <a class="auth-brand" href="/login">Disaster Shield</a>
+    <section class="auth-card" aria-labelledby="auth-title">
+      <p class="auth-eyebrow">Your alerts, in one place</p>
+      <h1 id="auth-title">Create your account</h1>
+      <p id="auth-description">Sign up to analyze locations and manage your alert subscriptions.</p>
+      <form id="auth-form">
+        <label for="auth-email">Email address</label>
+        <input id="auth-email" type="email" autocomplete="email" required>
+        <label for="auth-password">Password</label>
+        <input id="auth-password" type="password" autocomplete="new-password" minlength="10" maxlength="128" required>
+        <p id="password-hint" class="auth-hint">Use at least 10 characters.</p>
+        <button id="auth-submit" type="submit">Create account</button>
+      </form>
+      <p id="auth-status" class="auth-status" role="status" aria-live="polite"></p>
+      <p class="auth-switch"><span id="auth-switch-copy">Already have an account?</span> <a id="auth-switch-link" href="/login">Log in</a></p>
+    </section>
+  </main>
+</body>
+</html>

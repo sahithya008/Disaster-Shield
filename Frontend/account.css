@@ -1,0 +1,2 @@
+.account-toolbar { position: fixed; z-index: 10000; top: 12px; right: 14px; display: flex; align-items: center; gap: 11px; padding: 8px 11px; border: 1px solid rgba(145, 169, 196, .28); border-radius: 999px; background: rgba(12, 20, 36, .92); color: #edf4fc; font: 500 12px/1.2 system-ui, sans-serif; box-shadow: 0 8px 25px rgba(0,0,0,.18); }
+.account-toolbar button { border: 0; border-radius: 999px; padding: 7px 11px; background: #37bba9; color: #08201e; font: inherit; font-weight: 700; cursor: pointer; }

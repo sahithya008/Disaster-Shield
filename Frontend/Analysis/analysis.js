@@ -1,8 +1,9 @@
-const API_URL =
-  window.location.hostname === "127.0.0.1" ||
-  window.location.hostname === "localhost"
-    ? "http://127.0.0.1:5000/weather"
-    : window.location.origin + "/weather";
+const BACKEND_BASE_URL = window.location.port === "8080"
+  ? `${window.location.protocol}//${window.location.hostname}:5000`
+  : (window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost")
+    ? `${window.location.protocol}//${window.location.hostname}:5000`
+    : window.location.origin;
+const API_URL = `${BACKEND_BASE_URL}/weather`;
 
 // Global map and chart variables to prevent recreation bugs
 let mapInstance = null;
@@ -38,10 +39,10 @@ const descriptions = {
     critical: "Severe cyclone warning. Seek sturdy shelter.",
   },
   drought: {
-    low: "Normal water supply. No drought stress.",
-    moderate: "Possible drought stress. Conserve water.",
-    high: "Significant drought. Restrict water use.",
-    critical: "Severe drought. Comply with rationing measures.",
+    low: "No strong hot and dry weather signal in the current conditions.",
+    moderate: "Some hot or dry conditions. This does not establish drought.",
+    high: "Hot and dry conditions detected. This is not a drought diagnosis.",
+    critical: "Very hot and dry conditions detected. Follow local official advisories.",
   },
 };
 
@@ -62,13 +63,10 @@ const currentQuery = query;;
     }
 
     try {
-      const CITY_API_URL =
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname === "localhost"
-          ? "http://127.0.0.1:5000/city-suggestions"
-          : window.location.origin + "/city-suggestions";
+      const CITY_API_URL = `${BACKEND_BASE_URL}/city-suggestions`;
       const response = await fetch(
         `${CITY_API_URL}?q=${encodeURIComponent(query)}`,
+        { credentials: "include" },
       );
 
       const cities = await response.json();
@@ -159,9 +157,7 @@ function generateRecommendations(risks) {
 
   if (risks.drought >= 0.7) {
     recommendations.push(
-      "Conserve water whenever possible.",
-      "Avoid unnecessary water consumption.",
-      "Follow local water restriction guidelines.",
+      "Hot and dry weather detected; check local water and weather advisories.",
     );
   }
 
@@ -175,10 +171,117 @@ function generateRecommendations(risks) {
 }
 
 
+function addNotificationEntry(container, { tone = "info", label = "INFO", time = "", message = "", sourceUrl = "" }) {
+  const entry = document.createElement("div");
+  entry.className = `log-entry ${tone}`;
+  const header = document.createElement("div");
+  header.className = "log-header";
+  const badge = document.createElement("span");
+  badge.className = `log-badge badge-${tone}`;
+  badge.textContent = label;
+  const timeNode = document.createElement("span");
+  timeNode.className = "log-time";
+  timeNode.textContent = time ? new Date(time).toLocaleString() : "";
+  header.append(badge, timeNode);
+  const body = document.createElement("div");
+  body.className = "log-message";
+  body.textContent = message;
+  entry.append(header, body);
+  if (sourceUrl) {
+    const source = document.createElement("a");
+    source.href = sourceUrl;
+    source.target = "_blank";
+    source.rel = "noopener noreferrer";
+    source.textContent = "Source: IMD";
+    source.className = "notification-source-link";
+    entry.appendChild(source);
+  }
+  container.appendChild(entry);
+}
+
+async function loadNotificationLogs(district = "", state = "") {
+  const container = document.getElementById("dispatch-logs-box");
+  if (!container) return;
+  container.replaceChildren();
+  try {
+    const query = new URLSearchParams({ district, state });
+    const [alertResponse, logResponse, statusResponse] = await Promise.all([
+      fetch(`${BACKEND_BASE_URL}/api/notifications/alerts?${query}`, { credentials: "include" }),
+      fetch(`${BACKEND_BASE_URL}/api/notifications/logs`, { credentials: "include" }),
+      fetch(`${BACKEND_BASE_URL}/api/notifications/status`, { credentials: "include" }),
+    ]);
+    const alertData = await alertResponse.json();
+    const logData = await logResponse.json();
+    const statusData = await statusResponse.json();
+
+    const matchingAlerts = Array.isArray(alertData.alerts) ? alertData.alerts : [];
+    matchingAlerts.forEach((alert) => {
+      const tone = alert.severity === "red" ? "critical" : ["orange", "yellow"].includes(alert.severity) ? "warning" : "info";
+      addNotificationEntry(container, {
+        tone,
+        label: `OFFICIAL IMD ${(alert.severity || "unknown").toUpperCase()}`,
+        time: alert.observed_at,
+        message: `${alert.title} at ${alert.district}${alert.state ? `, ${alert.state}` : ""}. Issued ${alert.issue_date || "date not supplied"}${alert.valid_until ? `; valid until ${alert.valid_until}` : ""}. ${alert.details || ""}`,
+        sourceUrl: alert.source_url,
+      });
+    });
+
+    const districtKey = district.trim().toLowerCase();
+    const stateKey = state.trim().toLowerCase();
+    const deliveryLogs = Array.isArray(logData.logs) ? logData.logs : [];
+    deliveryLogs.filter((item) => (!districtKey || item.district.toLowerCase() === districtKey) && (!stateKey || !item.state || item.state.toLowerCase() === stateKey)).forEach((item) => {
+      const sent = item.status === "sent";
+      addNotificationEntry(container, {
+        tone: sent ? "success" : "warning",
+        label: `${item.channel.toUpperCase()} ${sent ? "SENT" : "NOT SENT"}`,
+        time: item.attempted_at,
+        message: `${item.title} for ${item.district}, ${item.state}. ${sent ? "Delivery accepted by provider." : (item.detail || "Delivery attempt failed.")}`,
+        sourceUrl: "",
+      });
+    });
+
+    const statusLine = document.getElementById("notification-service-status");
+    if (statusLine) {
+      if (!statusData.imd_configured) {
+        statusLine.textContent = "IMD API key is not configured in the backend .env file.";
+      } else if (statusData.last_error) {
+        statusLine.textContent = `IMD worker status: ${statusData.last_error}`;
+      } else if (!statusData.last_poll) {
+        statusLine.textContent = "IMD API is configured. Start backend/notification_worker.py to begin polling.";
+      } else {
+        const deliverySetup = [
+          !statusData.email_configured ? "Email disabled until SMTP settings are filled in .env." : "",
+          !statusData.telegram_configured ? "Telegram alerts disabled until TELEGRAM_BOT_TOKEN is set in .env." : "",
+        ].filter(Boolean).join(" ");
+        statusLine.textContent = `IMD feed last checked ${new Date(statusData.last_poll).toLocaleString()}. ${deliverySetup}`;
+      }
+    }
+
+    if (!container.children.length) {
+      const empty = document.createElement("p");
+      empty.className = "notification-empty";
+      empty.textContent = district
+        ? `No current official alerts or delivery records for ${district}${state ? `, ${state}` : ""}.`
+        : "Enter a district and state to view matching official IMD warnings.";
+      container.appendChild(empty);
+    }
+  } catch (error) {
+    const message = document.createElement("p");
+    message.className = "notification-empty";
+    message.textContent = "Notification service is unavailable. Start the Flask backend and notification worker.";
+    container.appendChild(message);
+  }
+}
+
+
 async function getWeatherData() {
   const city = document.getElementById("city").value.trim();
   const state = document.getElementById("state").value.trim();
   const country = document.getElementById("country").value.trim();
+  const districtSubscriptionInput = document.getElementById("subscribe-district");
+  const stateSubscriptionInput = document.getElementById("subscribe-state");
+  if (districtSubscriptionInput && !districtSubscriptionInput.value) districtSubscriptionInput.value = city;
+  if (stateSubscriptionInput && !stateSubscriptionInput.value) stateSubscriptionInput.value = state;
   const loading = document.getElementById("loading");
   const messageBox = document.getElementById("message-box");
   const results = document.getElementById("results");
@@ -187,7 +290,6 @@ async function getWeatherData() {
   const resultSummary = document.getElementById("result-summary");
   const analyzeBtn = document.getElementById("analyze-btn");
   const demoIndicator = document.getElementById("demo-mode-indicator");
-  const dispatchLogsBox = document.getElementById("dispatch-logs-box");
 
   const showMessage = (message, tone) => {
     messageBox.textContent = message;
@@ -221,10 +323,15 @@ async function getWeatherData() {
   try {
     const response = await fetch(API_URL, {
       method: "POST",
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ city, state, country }),
+      body: JSON.stringify({
+        city,
+        state,
+        country,
+      }),
     });
 
     const data = await response.json();
@@ -490,7 +597,7 @@ async function getWeatherData() {
         Heat: day.risks.heat_risk,
         Wildfire: day.risks.wildfire_risk,
         Cyclone: day.risks.cyclone_risk,
-        Drought: day.risks.drought_risk,
+        "Hot & dry": day.risks.drought_risk,
       };
 
       const sortedRisks = Object.entries(riskMap).sort((a, b) => b[1] - a[1]);
@@ -654,7 +761,7 @@ async function getWeatherData() {
             fill: false,
           },
           {
-            label: "Drought",
+            label: "Hot & dry conditions",
             data: data.forecast.map((day) => day.risks.drought_risk),
             borderColor: "#eab308",
             tension: 0.3,
@@ -683,89 +790,8 @@ async function getWeatherData() {
       },
     });
 
-    // Generate Dispatch Logs
-    dispatchLogsBox.innerHTML = "";
-    const addLog = (msg, tone) => {
-  const timeStr = new Date().toLocaleTimeString();
-
-  const badgeMap = {
-    success: {
-      label: "INFO",
-      className: "badge-info",
-      icon: "🛡️",
-    },
-    warning: {
-      label: "WARNING",
-      className: "badge-warning",
-      icon: "⚠️",
-    },
-    critical: {
-      label: "CRITICAL",
-      className: "badge-critical",
-      icon: "🚨",
-    },
-  };
-
-  const config = badgeMap[tone];
-
-  const entry = document.createElement("div");
-  entry.className = `log-entry ${tone}`;
-
-  entry.innerHTML = `
-    <div class="log-header">
-      <span class="log-badge ${config.className}">
-        ${config.icon} ${config.label}
-      </span>
-      <span class="log-time">${timeStr}</span>
-    </div>
-
-    <div class="log-message">
-      ${msg}
-    </div>
-  `;
-
-  dispatchLogsBox.appendChild(entry);
-};
-
-    addLog(
-      `Monitoring node activated at Lat ${lat.toFixed(4)}, Lon ${lon.toFixed(4)}`,
-      "success",
-    );
-    if (data.demo_mode) {
-      addLog(
-        `OpenWeather key unconfigured/expired. Defaulting to Demo Mode simulation.`,
-        "warning",
-      );
-    }
-
-    data.alerts.forEach((alert) => {
-      if (alert.includes("✅")) {
-        addLog(
-          `No active hazards flagged. Parameters sit within safety standard threshold limit.`,
-          "success",
-        );
-      } else {
-        addLog(
-          `CRITICAL BROADCAST: ${alert} active in the target area!`,
-          "critical",
-        );
-      }
-    });
-
-    if (data.risks.wildfire_risk >= 0.5) {
-      addLog(
-        `Extreme dryness index detected. Forest monitoring crew warned for high fire potential.`,
-        "warning",
-      );
-    }
-    if (data.risks.drought_risk >= 0.5) {
-      addLog(
-        `Moisture deficit index elevated. Local crop warning active.`,
-        "warning",
-      );
-    }
-
-    dispatchLogsBox.scrollTop = dispatchLogsBox.scrollHeight;
+    // Load official IMD alerts and real provider delivery attempts.
+    await loadNotificationLogs(city, state);
 
     // Results Card animation
     results.classList.remove("hidden");
@@ -801,32 +827,64 @@ function clearResults() {
   document.getElementById("message-box").classList.add("hidden");
 }
 
-// Handle alert subscription simulation
+// Save a real district subscription in the backend.
 document.addEventListener("DOMContentLoaded", () => {
-  const subForm = document.getElementById("subscribe-form");
-  if (subForm) {
-    subForm.addEventListener("submit", (e) => {
-      e.preventDefault();
-      const successMsg = document.getElementById("subscribe-success");
-      successMsg.classList.remove("hidden");
-      document.getElementById("subscribe-email").value = "";
+  const form = document.getElementById("subscribe-form");
+  const notice = document.getElementById("subscribe-success");
+  const districtInput = document.getElementById("subscribe-district");
+  const stateInput = document.getElementById("subscribe-state");
+  const telegramInput = document.getElementById("subscribe-telegram-chat-id");
+  const telegramOption = form?.querySelector('input[name="notification-channel"][value="telegram"]');
+  if (telegramInput && telegramOption) {
+    const syncTelegramRequirement = () => { telegramInput.required = telegramOption.checked; };
+    telegramOption.addEventListener("change", syncTelegramRequirement);
+    syncTelegramRequirement();
+  }
+  const previousDistrict = document.getElementById("city")?.value;
+  const previousState = document.getElementById("state")?.value;
+  if (previousDistrict && districtInput && !districtInput.value) districtInput.value = previousDistrict;
+  if (previousState && stateInput && !stateInput.value) stateInput.value = previousState;
 
-      // Add a entry to logs
-      const dispatchLogsBox = document.getElementById("dispatch-logs-box");
-      if (dispatchLogsBox) {
-        const timeStr = new Date().toLocaleTimeString();
-        const entry = document.createElement("div");
-        entry.className = "log-entry success";
-        entry.innerHTML = `[${timeStr}] <strong>SUBSCRIBER:</strong> Stream registered for simulated notifications.`;
-        dispatchLogsBox.appendChild(entry);
-        dispatchLogsBox.scrollTop = dispatchLogsBox.scrollHeight;
+  if (form) {
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const channels = [...form.querySelectorAll('input[name="notification-channel"]:checked')].map((input) => input.value);
+      const payload = {
+        email: document.getElementById("subscribe-email").value.trim(),
+        telegram_chat_id: document.getElementById("subscribe-telegram-chat-id").value.trim(),
+        district: districtInput.value.trim(),
+        state: stateInput.value.trim(),
+        categories: [document.getElementById("subscribe-type").value],
+        channels,
+        consent: document.getElementById("subscribe-consent").checked,
+      };
+      const button = form.querySelector('button[type="submit"]');
+      button.disabled = true;
+      notice.classList.remove("hidden");
+      notice.textContent = "Saving subscription...";
+      try {
+        const response = await fetch(`${BACKEND_BASE_URL}/api/notifications/subscribe`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) throw new Error(result.message || "Subscription could not be saved.");
+        notice.textContent = result.message;
+        await loadNotificationLogs(payload.district, payload.state);
+      } catch (error) {
+        notice.textContent = error.message || "Notification service is unavailable.";
+      } finally {
+        button.disabled = false;
       }
-
-      setTimeout(() => {
-        successMsg.classList.add("hidden");
-      }, 4000);
     });
   }
+
+  loadNotificationLogs(districtInput?.value || "", stateInput?.value || "");
+  window.setInterval(() => {
+    loadNotificationLogs(districtInput?.value || "", stateInput?.value || "");
+  }, 60000);
 });
 
 window.useCurrentLocation = async function () {
@@ -841,14 +899,11 @@ window.useCurrentLocation = async function () {
       const longitude = position.coords.longitude;
 
       try {
-        const reverseGeocodeUrl =
-          window.location.hostname === "127.0.0.1" ||
-          window.location.hostname === "localhost"
-            ? "http://127.0.0.1:5000/reverse-geocode"
-            : window.location.origin + "/reverse-geocode";
+        const reverseGeocodeUrl = `${BACKEND_BASE_URL}/reverse-geocode`;
 
         const response = await fetch(reverseGeocodeUrl, {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -924,7 +979,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (clearBtn) {
       clearBtn.addEventListener("click", () => {
-        localStorage.removeItem("recentSearches");
+        localStorage.removeItem(recentSearchStorageKey());
         if (typeof displayRecentSearches === "function") {
             displayRecentSearches();
         }
@@ -1061,7 +1116,11 @@ async function fetchAndRenderChart(lat, lon) {
     }
 
 function getRecentSearches() {
-  return JSON.parse(localStorage.getItem("recentSearches")) || [];
+  return JSON.parse(localStorage.getItem(recentSearchStorageKey())) || [];
+}
+
+function recentSearchStorageKey() {
+  return `recentSearches_${localStorage.getItem("disasterShieldUserId") || "guest"}`;
 }
 
 function saveRecentSearch(city, state, country) {
@@ -1087,7 +1146,7 @@ function saveRecentSearch(city, state, country) {
   searches.unshift(newSearch);
   searches = searches.slice(0, 5);
 
-  localStorage.setItem("recentSearches", JSON.stringify(searches));
+  localStorage.setItem(recentSearchStorageKey(), JSON.stringify(searches));
 
   displayRecentSearches();
 }
@@ -1141,7 +1200,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   if (clearBtn) {
     clearBtn.addEventListener("click", () => {
-      localStorage.removeItem("recentSearches");
+      localStorage.removeItem(recentSearchStorageKey());
       displayRecentSearches();
     });
   }

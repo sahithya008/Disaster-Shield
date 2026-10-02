@@ -1,12 +1,13 @@
 const CHATBOT_API_URL =
     window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost"
-        ? "http://127.0.0.1:5000/chatbot"
+        ? `${window.location.protocol}//${window.location.hostname}:5000/chatbot`
         : window.location.origin + "/chatbot";
 
 // ==========================================
 // FIX FOR ISSUE #85: Global Tracking Utility
 // ==========================================
 let globalChatHistory = [];
+const chatHistoryStorageKey = () => `climate_chatbot_history_${localStorage.getItem('disasterShieldUserId') || 'guest'}`;
 
 function appendChatMessage(container, text, role, shouldSave = true) {
     const message = document.createElement('div');
@@ -20,7 +21,7 @@ function appendChatMessage(container, text, role, shouldSave = true) {
     if (shouldSave) {
         globalChatHistory.push({ text, role });
         try {
-            localStorage.setItem('climate_chatbot_history', JSON.stringify(globalChatHistory));
+            localStorage.setItem(chatHistoryStorageKey(), JSON.stringify(globalChatHistory));
         } catch (e) {
             console.error("Failed to write message to localStorage:", e);
         }
@@ -91,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // FIX FOR ISSUE #85: Restore Chat History on Startup
     // ==========================================
     try {
-        const savedHistory = localStorage.getItem('climate_chatbot_history');
+        const savedHistory = localStorage.getItem(chatHistoryStorageKey());
         if (savedHistory) {
             globalChatHistory = JSON.parse(savedHistory);
             globalChatHistory.forEach(msg => {
@@ -206,6 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const response = await fetch(CHATBOT_API_URL, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json'
                 },

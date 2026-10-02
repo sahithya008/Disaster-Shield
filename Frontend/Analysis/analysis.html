@@ -11,6 +11,7 @@
 
     <link rel="stylesheet"
           href="analysis.css" />
+    <link rel="stylesheet" href="../account.css" />
 
     <script src="../theme.js"></script>
 
@@ -239,8 +240,8 @@
                             </div>
 
                             <div class="section-title">⚠ Climate Risk Analysis</div>
-                            
-                            
+
+
                             <div class="risk-grid-five">
                                 <div class="risk-card flood" role="region" aria-labelledby="flood-title">
                                     <h3 id="flood-title">Flood Risk</h3>
@@ -267,10 +268,11 @@
                                     <p class="risk-description" aria-live="polite">--</p>
                                 </div>
                                 <div class="risk-card drought" role="region" aria-labelledby="drought-title">
-                                    <h3 id="drought-title">Drought Risk</h3>
+                                    <h3 id="drought-title">Hot &amp; Dry Conditions</h3>
                                     <p id="drought-risk" aria-live="polite"></p>
                                     <p class="risk-label" aria-live="polite">--</p>
                                     <p class="risk-description" aria-live="polite">--</p>
+                                    <small>This short-term weather indicator is not a drought assessment.</small>
                                 </div>
                             </div>
                         </div>
@@ -318,65 +320,49 @@
                         </div>
                     </div>
 
-                    <!-- Mock Emergency Alert Subscription and Dispatch Center -->
+                    <!-- IMD alert subscriptions and delivery status -->
                     <div class="alerts-center-section">
                         <div class="subscription-card">
                             <h3>🔔 Subscribe to Local Warnings</h3>
-                            <p>Register your email to receive simulated notification dispatches when local risk levels exceed safety thresholds.</p>
-                            
+                            <p>Choose a district, hazard types, and delivery channels for official IMD warnings. App-modeled risk scores are shown separately from official alerts.</p>
+
                             <form id="subscribe-form" class="subscribe-form">
                                 <div class="subscribe-inputs">
-                                    <input type="email" id="subscribe-email" placeholder="Enter your email" required>
-                                    <select id="subscribe-type">
-                                        <option value="all">All Warnings</option>
-                                        <option value="flood">Flooding Only</option>
-                                        <option value="heat">Extreme Heat Only</option>
-                                        <option value="wildfire">Wildfire Danger Only</option>
+                                    <input type="email" id="subscribe-email" placeholder="Email address" autocomplete="email" required>
+                                    <input type="text" id="subscribe-telegram-chat-id" placeholder="Telegram chat ID, if selected">
+                                    <input type="text" id="subscribe-district" placeholder="District to monitor" required>
+                                    <input type="text" id="subscribe-state" placeholder="State" required>
+                                    <select id="subscribe-type" aria-label="Hazards">
+                                        <option value="all">All IMD warnings</option>
+                                        <option value="rain">Heavy rain and flood-related warnings</option>
+                                        <option value="heat">Heat warnings</option>
+                                        <option value="storm">Thunderstorm, wind, lightning, and dust warnings</option>
+                                        <option value="other">Other IMD warnings</option>
                                     </select>
                                 </div>
-                                <button type="submit">Activate Alert Stream</button>
+                                <fieldset class="notification-channels">
+                                    <legend>Delivery channels for future alerts</legend>
+                                    <label><input type="checkbox" name="notification-channel" value="dashboard" checked> Dashboard</label>
+                                    <label><input type="checkbox" name="notification-channel" value="email" checked> Email</label>
+                                    <label><input type="checkbox" name="notification-channel" value="telegram"> Telegram</label>
+                                </fieldset>
+                                    <label class="notification-consent">
+                                    <input type="checkbox" id="subscribe-consent" required>
+                                    I consent to storing these contact details, receiving the first and recurring five-day location analyses by email, receiving an email report for locations I search in this browser, and receiving the selected official warnings. Telegram is used only for selected alerts and signup confirmation.
+                                </label>
+                                <button type="submit">Save Alert Subscription</button>
                             </form>
-                            <div id="subscribe-success" class="subscribe-success-msg hidden">
-                                ✓ Subscription active! Emergency dispatches will be routed to the live logs.
-                            </div>
+
+                            <div id="subscribe-success" class="subscribe-success-msg hidden" role="status"></div>
+                            <p id="notification-service-status" class="notification-service-status" role="status"></p>
+
                         </div>
 
                         <div class="dispatch-logs-card">
                             <h3>🛡 Disaster Shield Emergency Dispatch</h3>
-                            <p>Live alert logs processed for this region:</p>
+                            <p>Official IMD warnings and actual delivery attempts. Start the notification worker to refresh these logs.</p>
                             <div class="dispatch-logs-box timeline" id="dispatch-logs-box">
-    <div class="log-entry info">
-        <div class="log-header">
-            <span class="severity-badge info-badge">INFO</span>
-            <span class="log-time">11:18 AM</span>
-        </div>
-        <div class="log-content">
-            <span class="log-icon">🟢</span>
-            <span>Monitoring node activated. No active hazards detected.</span>
-        </div>
-    </div>
-    
-    <div class="log-entry warning">
-        <div class="log-header">
-            <span class="severity-badge warning-badge">WARNING</span>
-            <span class="log-time">11:18 AM</span>
-        </div>
-        <div class="log-content">
-            <span class="log-icon">⚠️</span>
-            <span>Moisture deficit elevated. Local crop warning active.</span>
-        </div>
-    </div>
-
-    <div class="log-entry critical">
-        <div class="log-header">
-            <span class="severity-badge critical-badge">CRITICAL</span>
-            <span class="log-time">11:20 AM</span>
-        </div>
-        <div class="log-content">
-            <span class="log-icon">🚨</span>
-            <span>Flood threshold exceeded. Immediate action required.</span>
-        </div>
-    </div>
+                                <p class="notification-empty">No official warnings loaded yet. The worker must be running.</p>
 </div>
                         </div>
                     </div>
@@ -527,6 +513,7 @@
     <button id="scrollTopBtn" class="scroll-top-btn" title="Back to Top">↑</button>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="../account.js"></script>
     <script src="analysis.js"></script>
     <script src="../chatbot.js"></script>
 

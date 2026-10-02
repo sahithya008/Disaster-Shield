@@ -1,6 +1,8 @@
 import os
 import sys
 import requests
+from datetime import timedelta
+from functools import wraps
 
 from dotenv import load_dotenv
 
@@ -40,8 +42,11 @@ def fetch_gis_alert_data():
     
 from flask import (
     Flask,
+    g,
     jsonify,
     request,
+    redirect,
+    session,
     send_from_directory
 )
 
@@ -52,7 +57,23 @@ from flask_cors import CORS
 # =========================================================
 
 app = Flask(__name__)
-CORS(app)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "").strip()
+if not app.secret_key:
+    raise RuntimeError("FLASK_SECRET_KEY must be set in the project .env file.")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE=os.getenv("SESSION_COOKIE_SAMESITE", "Lax"),
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").lower() in ("1", "true", "yes"),
+    PERMANENT_SESSION_LIFETIME=timedelta(days=7),
+)
+cors_origins = [item.strip() for item in os.getenv("FRONTEND_ORIGINS", "").split(",") if item.strip()]
+if not cors_origins:
+    cors_origins = [
+        "http://localhost:8000", "http://127.0.0.1:8000",
+        "http://localhost:8080", "http://127.0.0.1:8080",
+        "http://localhost:5500", "http://127.0.0.1:5500",
+    ]
+CORS(app, origins=cors_origins, supports_credentials=True)
 
 BASE_DIR = os.path.dirname(
     os.path.dirname(
@@ -70,6 +91,36 @@ if CHATBOT_DIR not in sys.path:
     sys.path.insert(0, CHATBOT_DIR)
 
 from chatbot import handle_chatbot_request
+from notification_service import (
+    create_subscription,
+    create_account,
+    authenticate_account,
+    get_account,
+    fetch_subscription_analysis,
+    initialize_database,
+    last_poll,
+    last_error,
+    list_alerts,
+    send_signup_confirmations,
+    send_search_analysis_to_subscriber,
+    record_subscription_report_result,
+    subscription_logs,
+)
+
+initialize_database()
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user_id = session.get("user_id")
+        account = get_account(user_id) if user_id else None
+        if not account:
+            session.clear()
+            return jsonify({"success": False, "message": "Please log in to continue."}), 401
+        g.account = account
+        return view(*args, **kwargs)
+    return wrapped
 
 # =========================================================
 # FRONTEND ROUTES
@@ -77,6 +128,8 @@ from chatbot import handle_chatbot_request
 
 @app.route("/")
 def home():
+    if not session.get("user_id"):
+        return redirect("/login")
     return send_from_directory(
         FRONTEND_DIR,
         "index.html"
@@ -85,6 +138,8 @@ def home():
 
 @app.route("/Analysis/<path:filename>")
 def analysis_files(filename):
+    if filename.lower().endswith(".html") and not session.get("user_id"):
+        return redirect("/login")
     return send_from_directory(
         os.path.join(FRONTEND_DIR, "Analysis"),
         filename
@@ -93,10 +148,57 @@ def analysis_files(filename):
 
 @app.route("/<path:filename>")
 def frontend_files(filename):
+    if filename.lower().endswith(".html") and not session.get("user_id"):
+        return redirect("/login")
     return send_from_directory(
         FRONTEND_DIR,
         filename
     )
+
+
+@app.route("/login")
+@app.route("/register")
+def account_page():
+    if session.get("user_id") and get_account(session["user_id"]):
+        return redirect("/")
+    return send_from_directory(FRONTEND_DIR, "auth.html")
+
+
+@app.route("/api/auth/register", methods=["POST"])
+def register_account():
+    data = request.get_json(silent=True) or {}
+    try:
+        account = create_account(data.get("email"), data.get("password"))
+        session.clear()
+        session["user_id"] = account["id"]
+        session.permanent = True
+        return jsonify({"success": True, "user": account}), 201
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+
+
+@app.route("/api/auth/login", methods=["POST"])
+def login_account():
+    data = request.get_json(silent=True) or {}
+    account = authenticate_account(data.get("email"), data.get("password"))
+    if not account:
+        return jsonify({"success": False, "message": "Email or password is incorrect."}), 401
+    session.clear()
+    session["user_id"] = account["id"]
+    session.permanent = True
+    return jsonify({"success": True, "user": account})
+
+
+@app.route("/api/auth/me", methods=["GET"])
+def current_account():
+    account = get_account(session.get("user_id")) if session.get("user_id") else None
+    return jsonify({"success": True, "authenticated": bool(account), "user": account})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def logout_account():
+    session.clear()
+    return jsonify({"success": True})
 
 # =========================================================
 # THRESHOLDS
@@ -217,6 +319,7 @@ def weather_condition_from_code(code):
 
 
 @app.route("/weather", methods=["POST"])
+@login_required
 def get_weather_insights():
 
     try:
@@ -422,7 +525,7 @@ def get_weather_insights():
 
         if drought_risk_metric >= 0.6:
             calculated_alerts.append(
-                "☀ Drought Conditions Possible"
+                "☀ Hot and dry conditions detected (not a drought assessment)"
             )
 
         if not calculated_alerts:
@@ -493,7 +596,7 @@ def get_weather_insights():
             + (f"Highest modeled daily hazard is {peak[1]} ({round(peak[0] * 100)}%) on {peak[2]}." if forecast else "No daily forecast data was returned.")
         )
 
-        return jsonify({
+        report = {
 
             "success": True,
 
@@ -535,7 +638,9 @@ def get_weather_insights():
             "forecast_source": "Open-Meteo",
 
             "alerts": calculated_alerts,
-        })
+        }
+        send_search_analysis_to_subscriber(g.account["email"], report)
+        return jsonify(report)
 
     except Exception as general_err:
         print("Weather Route Error:")
@@ -543,6 +648,7 @@ def get_weather_insights():
         return jsonify({"success": False, "message": "Internal server error."}), 500
 
 @app.route("/reverse-geocode", methods=["POST"])
+@login_required
 def reverse_geocode():
 
     try:
@@ -619,6 +725,7 @@ def reverse_geocode():
         })
 
 @app.route("/city-suggestions", methods=["GET"])
+@login_required
 def city_suggestions():
 
     query = request.args.get("q", "").strip()
@@ -686,11 +793,99 @@ def city_suggestions():
         print("City Suggestions Error:", e)
         return jsonify([])
     
+
+# =========================================================
+# OFFICIAL IMD NOTIFICATION APIs
+# =========================================================
+
+@app.route("/api/notifications/subscribe", methods=["POST"])
+@login_required
+def subscribe_to_notifications():
+    data = request.get_json(silent=True) or {}
+    data["email"] = g.account["email"]
+    try:
+        subscription_id, is_first_signup = create_subscription(data, g.account["id"])
+        if is_first_signup:
+            report = None
+            if "email" in (data.get("channels") or []):
+                try:
+                    report = fetch_subscription_analysis(
+                        str(data.get("district", "")).strip(),
+                        str(data.get("state", "")).strip(),
+                    )
+                except Exception as error:
+                    print(f"Initial subscription analysis unavailable: {type(error).__name__}")
+            confirmation = send_signup_confirmations(
+                str(data.get("email", "")).strip().lower(),
+                str(data.get("telegram_chat_id", "")).strip(),
+                str(data.get("district", "")).strip(),
+                str(data.get("state", "")).strip(),
+                report,
+                data.get("channels") or [],
+            )
+            if "email" in (data.get("channels") or []):
+                email_result = confirmation.get("email", {})
+                record_subscription_report_result(subscription_id, bool(report and email_result.get("sent")),
+                                                  email_result.get("error", "Initial location analysis unavailable"))
+            sent = [channel for channel, result in confirmation.items() if result["sent"]]
+            failed = [channel for channel, result in confirmation.items() if not result["sent"]]
+            analysis_sent = bool(report and confirmation.get("email", {}).get("sent"))
+            if not failed and analysis_sent:
+                message = "Subscription saved. Your first location analysis was sent by email; email analyses will repeat every 5 days. Official warnings are sent as they arrive."
+            elif not failed and "email" not in (data.get("channels") or []):
+                message = "Subscription saved. Email delivery is not selected, so location analyses and search reports are disabled."
+            elif not failed:
+                message = "Subscription saved. The first location analysis could not be sent yet and will be retried by the notification worker."
+            elif sent:
+                message = f"Subscription saved. Confirmation sent by {sent[0]}; the other confirmation could not be sent. Check notification provider settings."
+            else:
+                message = "Subscription saved, but confirmation email and Telegram message could not be sent. Check notification provider settings."
+        else:
+            confirmation = None
+            message = "Subscription preferences updated. Signup confirmations are sent only on the first signup."
+        return jsonify({"success": True, "subscription_id": subscription_id,
+                        "first_signup": is_first_signup,
+                        "confirmation": confirmation,
+                        "message": message}), 201
+    except ValueError as error:
+        return jsonify({"success": False, "message": str(error)}), 400
+    except Exception as error:
+        print(f"Notification subscription error: {type(error).__name__}")
+        return jsonify({"success": False, "message": "Could not save this subscription."}), 500
+
+
+@app.route("/api/notifications/alerts", methods=["GET"])
+@login_required
+def notification_alerts():
+    district = request.args.get("district", "").strip()
+    state = request.args.get("state", "").strip()
+    return jsonify({"success": True, "alerts": list_alerts(district, state), "last_poll": last_poll(), "last_error": last_error()})
+
+
+@app.route("/api/notifications/logs", methods=["GET"])
+@login_required
+def notification_logs():
+    return jsonify({"success": True, "logs": subscription_logs(user_id=g.account["id"])})
+
+
+@app.route("/api/notifications/status", methods=["GET"])
+@login_required
+def notification_status():
+    return jsonify({
+        "success": True,
+        "imd_configured": bool(os.environ.get("IMD_API_KEY", "").strip()),
+        "email_configured": all(os.environ.get(key, "").strip() for key in ("SMTP_HOST", "SMTP_USERNAME", "SMTP_PASSWORD", "SMTP_FROM")),
+        "telegram_configured": bool(os.environ.get("TELEGRAM_BOT_TOKEN", "").strip()),
+        "last_poll": last_poll(),
+        "last_error": last_error(),
+    })
+
 # =========================================================
 # CHATBOT API
 # =========================================================
 
 @app.route("/chatbot", methods=["POST"])
+@login_required
 def chatbot():
 
     try:

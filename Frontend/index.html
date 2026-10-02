@@ -8,6 +8,7 @@
     <title>Disaster Shield | Home</title>
 
     <link rel="stylesheet" href="style.css" />
+    <link rel="stylesheet" href="account.css" />
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
 
@@ -40,7 +41,7 @@
         <div class="nav-links">
           <a href="#features">Features</a>
           <a href="Analysis/analysis.html">Analyze</a>
-          <a href="#contact">Contact</a>
+          <a href="#notification-signup">Get Alerts</a>
           <a
             href="https://github.com/sahithya008/Disaster-Shield"
             target="_blank"
@@ -275,6 +276,41 @@
             </article>
           </div>
         </section>
+
+        <section id="notification-signup" class="home-notification-section" aria-labelledby="home-notification-title">
+          <div class="home-notification-copy">
+            <span class="eyebrow">Local official warnings</span>
+            <h2 id="home-notification-title">Get alerts for your area</h2>
+            <p>Save your email and Telegram chat ID, choose the district and hazards you care about, and select email, Telegram, or dashboard delivery for official IMD warnings.</p>
+            <p class="home-notification-note">Email and Telegram alerts are sent when matching official warnings are received. Forecasts and alerts can change; follow instructions from local authorities.</p>
+          </div>
+          <form id="home-notification-form" class="home-notification-form">
+            <div class="home-notification-fields">
+              <label>Email address<input type="email" id="home-alert-email" autocomplete="email" placeholder="you@example.com" required></label>
+              <label>Telegram chat ID, if selected<input type="text" id="home-alert-telegram-chat-id" placeholder="Start the bot, then enter your chat ID"></label>
+              <label>District to monitor<input type="text" id="home-alert-district" placeholder="Warangal" required></label>
+              <label>State<input type="text" id="home-alert-state" placeholder="Telangana" required></label>
+              <label class="home-alert-hazard">Hazard types
+                <select id="home-alert-type">
+                  <option value="all">All IMD warnings</option>
+                  <option value="rain">Heavy rain and flood warnings</option>
+                  <option value="heat">Heat warnings</option>
+                  <option value="storm">Thunderstorm, wind, lightning, and dust</option>
+                  <option value="other">Other IMD warnings</option>
+                </select>
+              </label>
+            </div>
+            <fieldset class="home-alert-channels">
+              <legend>Delivery method for future alerts</legend>
+              <label><input type="checkbox" name="home-alert-channel" value="dashboard" checked> Dashboard</label>
+              <label><input type="checkbox" name="home-alert-channel" value="email" checked> Email</label>
+              <label><input type="checkbox" name="home-alert-channel" value="telegram"> Telegram</label>
+            </fieldset>
+            <label class="home-alert-consent"><input type="checkbox" id="home-alert-consent" required> I agree to store these contact details, receive the first and recurring five-day location analyses by email, receive an email report for locations I search in this browser, and receive the selected official alerts. Telegram is used only for selected alerts and signup confirmation.</label>
+            <button type="submit" class="primary-action">Sign up for alerts</button>
+            <p id="home-alert-status" class="home-alert-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
       </main>
 
       <footer id="contact" style="
@@ -443,7 +479,9 @@
     </div>
     <button id="scrollTopBtn" class="scroll-top-btn" title="Back to Top">↑</button>
 
+    <script src="account.js"></script>
     <script src="script.js"></script>
+    <script src="home-notifications.js"></script>
     <script src="chatbot.js"></script>
 </body>
 </html>
