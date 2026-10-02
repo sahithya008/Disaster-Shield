@@ -51,10 +51,10 @@ const suggestionsBox = document.getElementById("city-suggestions");
 
 if (cityInput && suggestionsBox) {
   cityInput.addEventListener("input", async () => {
-      console.log("Typing:", cityInput.value);
+    console.log("Typing:", cityInput.value);
 
     const query = cityInput.value.trim();
-const currentQuery = query;;
+    const currentQuery = query;;
 
     if (query.length < 2) {
       suggestionsBox.innerHTML = "";
@@ -71,29 +71,29 @@ const currentQuery = query;;
 
       const cities = await response.json();
       if (cityInput.value.trim() !== currentQuery) {
-  return;
-}
+        return;
+      }
       console.log("Cities:", cities);
 
-     suggestionsBox.innerHTML = "";
+      suggestionsBox.innerHTML = "";
 
-if (cities.length === 0) {
-  suggestionsBox.classList.add("hidden");
-  return;
-}
+      if (cities.length === 0) {
+        suggestionsBox.classList.add("hidden");
+        return;
+      }
 
-suggestionsBox.classList.remove("hidden");
-suggestionsBox.classList.remove("hidden");
-console.log("After remove:", suggestionsBox.className);
-console.log(cities);
+      suggestionsBox.classList.remove("hidden");
+      suggestionsBox.classList.remove("hidden");
+      console.log("After remove:", suggestionsBox.className);
+      console.log(cities);
       cities.forEach((city) => {
         const item = document.createElement("div");
 
         item.className = "city-suggestion-item";
 
         item.textContent = [city.city, city.state, city.country]
-  .filter(Boolean)
-  .join(", ");
+          .filter(Boolean)
+          .join(", ");
 
         item.addEventListener("click", () => {
           cityInput.value = city.city;
@@ -107,7 +107,7 @@ console.log(cities);
         suggestionsBox.appendChild(item);
       });
       console.log("Children:", suggestionsBox.children.length);
-console.log(suggestionsBox.innerHTML);
+      console.log(suggestionsBox.innerHTML);
     } catch (err) {
       console.error("Autocomplete Error:", err);
     }
@@ -345,7 +345,7 @@ async function getWeatherData() {
     }
 
     hideMessage();
-    
+
     if (typeof saveRecentSearch === "function") {
       saveRecentSearch(city, state, country);
     }
@@ -497,24 +497,11 @@ async function getWeatherData() {
     if (!mapInstance) {
       mapInstance = L.map("map").setView([lat, lon], 10);
 
-      // Theme-aware tile layers
-      const darkTile  = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-      const lightTile = 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png';
-
-      const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
-      let tileLayer = L.tileLayer(
-        currentTheme === 'light' ? lightTile : darkTile,
-        { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }
-      ).addTo(mapInstance);
-
-      // Swap tile layer when theme changes
-      window.addEventListener('themechange', function (e) {
-        tileLayer.remove();
-        tileLayer = L.tileLayer(
-          e.detail.theme === 'light' ? lightTile : darkTile,
-          { attribution: '© OpenStreetMap © CARTO', maxZoom: 19 }
-        ).addTo(mapInstance);
-      });
+      const mapAttribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: mapAttribution,
+        maxZoom: 19,
+      }).addTo(mapInstance);
     } else {
       mapInstance.setView([lat, lon], 10);
       // Clear old layers (except the base tile layer)
@@ -563,9 +550,9 @@ async function getWeatherData() {
             </div>
         `,
       )
-      mapInstance.once("moveend", () => {
-        mapMarker.openPopup();
-      });
+    mapInstance.once("moveend", () => {
+      mapMarker.openPopup();
+    });
 
     // Render 7-Day Forecast
     const forecastContainer = document.getElementById(
@@ -937,71 +924,71 @@ window.useCurrentLocation = async function () {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-    // Typewriter effect
-    const typingTextElement = document.getElementById("hero-typing-text");
-    if (typingTextElement) {
-        const textToType = "Check flood and heat risk for any location in seconds.";
-        let i = 0;
-        
-        typingTextElement.innerHTML = '<span id="typing-content"></span><span class="typewriter-cursor"></span>';
-        const contentSpan = document.getElementById("typing-content");
+  // Typewriter effect
+  const typingTextElement = document.getElementById("hero-typing-text");
+  if (typingTextElement) {
+    const textToType = "Check flood and heat risk for any location in seconds.";
+    let i = 0;
 
-        function typeWriter() {
-            if (i < textToType.length) {
-                contentSpan.innerHTML += textToType.charAt(i);
-                i++;
-                setTimeout(typeWriter, 40);
-            } else {
-                setTimeout(() => {
-                    const cursor = document.querySelector('.typewriter-cursor');
-                    if(cursor) cursor.style.display = 'none';
-                }, 3000);
-            }
-        }
-        
-        setTimeout(typeWriter, 400);
+    typingTextElement.innerHTML = '<span id="typing-content"></span><span class="typewriter-cursor"></span>';
+    const contentSpan = document.getElementById("typing-content");
+
+    function typeWriter() {
+      if (i < textToType.length) {
+        contentSpan.innerHTML += textToType.charAt(i);
+        i++;
+        setTimeout(typeWriter, 40);
+      } else {
+        setTimeout(() => {
+          const cursor = document.querySelector('.typewriter-cursor');
+          if (cursor) cursor.style.display = 'none';
+        }, 3000);
+      }
     }
 
-    const toggleBtn = document.getElementById("toggle-history-btn");
-    const wrapper = document.getElementById("recent-search-wrapper");
-    const clearBtn = document.getElementById("clear-history-btn");
+    setTimeout(typeWriter, 400);
+  }
 
-    if (toggleBtn && wrapper) {
-      toggleBtn.addEventListener("click", () => {
-        wrapper.classList.toggle("show-history");
-        if (wrapper.classList.contains("show-history")) {
-          toggleBtn.innerText = "Recent Searches ▲";
-        } else {
-          toggleBtn.innerText = "Recent Searches ▼";
-        }
-      });
-    }
+  const toggleBtn = document.getElementById("toggle-history-btn");
+  const wrapper = document.getElementById("recent-search-wrapper");
+  const clearBtn = document.getElementById("clear-history-btn");
 
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        localStorage.removeItem(recentSearchStorageKey());
-        if (typeof displayRecentSearches === "function") {
-            displayRecentSearches();
-        }
-      });
-    }
+  if (toggleBtn && wrapper) {
+    toggleBtn.addEventListener("click", () => {
+      wrapper.classList.toggle("show-history");
+      if (wrapper.classList.contains("show-history")) {
+        toggleBtn.innerText = "Recent Searches ▲";
+      } else {
+        toggleBtn.innerText = "Recent Searches ▼";
+      }
+    });
+  }
 
-    // Image carousel effect for analysis.html
-    const carouselImages = document.querySelectorAll(".hero-image-carousel .carousel-img");
-    if (carouselImages.length > 0) {
-        let currentImageIndex = 0;
-        
-        setInterval(() => {
-            carouselImages[currentImageIndex].classList.remove("active");
-            currentImageIndex = (currentImageIndex + 1) % carouselImages.length;
-            carouselImages[currentImageIndex].classList.add("active");
-        }, 5000);
-    }
+  if (clearBtn) {
+    clearBtn.addEventListener("click", () => {
+      localStorage.removeItem(recentSearchStorageKey());
+      if (typeof displayRecentSearches === "function") {
+        displayRecentSearches();
+      }
+    });
+  }
 
-    // Default India Chart
-    if (typeof fetchAndRenderChart === 'function') {
-        fetchAndRenderChart(20.5937, 78.9629);
-    }
+  // Image carousel effect for analysis.html
+  const carouselImages = document.querySelectorAll(".hero-image-carousel .carousel-img");
+  if (carouselImages.length > 0) {
+    let currentImageIndex = 0;
+
+    setInterval(() => {
+      carouselImages[currentImageIndex].classList.remove("active");
+      currentImageIndex = (currentImageIndex + 1) % carouselImages.length;
+      carouselImages[currentImageIndex].classList.add("active");
+    }, 5000);
+  }
+
+  // Default India Chart
+  if (typeof fetchAndRenderChart === 'function') {
+    fetchAndRenderChart(20.5937, 78.9629);
+  }
 });
 
 const scrollTopBtn = document.getElementById("scrollTopBtn");
@@ -1026,185 +1013,185 @@ if (scrollTopBtn) {
 let temperatureChartInstance = null;
 
 async function fetchAndRenderChart(lat, lon) {
-    const chartUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
-    try {
-        const res = await fetch(chartUrl);
-        const data = await res.json();
-        
-        // Populate default current weather if the fields are empty
-        if (data.current) {
-            const tempEl = document.getElementById('temperature');
-            if (tempEl && (!tempEl.innerText || tempEl.innerText.trim() === "")) {
-                tempEl.innerText = `${data.current.temperature_2m} °C`;
-                document.getElementById('humidity').innerText = `${data.current.relative_humidity_2m} %`;
-                document.getElementById('rainfall').innerText = `${data.current.precipitation} mm`;
-                document.getElementById('wind').innerText = `${data.current.wind_speed_10m} km/h`;
-                document.getElementById('location').innerText = 'Overall India (Default)';
-                
-                // Mock default risk for India (could calculate it based on above data)
-                document.getElementById('flood-risk').innerText = '0.12';
-                document.getElementById('heat-risk').innerText = '0.85';
-            }
-        }
+  const chartUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+  try {
+    const res = await fetch(chartUrl);
+    const data = await res.json();
 
-        const dates = data.daily.time.map(d => {
-            const date = new Date(d);
-            return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        });
-        const maxTemps = data.daily.temperature_2m_max;
-        const minTemps = data.daily.temperature_2m_min;
+    // Populate default current weather if the fields are empty
+    if (data.current) {
+      const tempEl = document.getElementById('temperature');
+      if (tempEl && (!tempEl.innerText || tempEl.innerText.trim() === "")) {
+        tempEl.innerText = `${data.current.temperature_2m} °C`;
+        document.getElementById('humidity').innerText = `${data.current.relative_humidity_2m} %`;
+        document.getElementById('rainfall').innerText = `${data.current.precipitation} mm`;
+        document.getElementById('wind').innerText = `${data.current.wind_speed_10m} km/h`;
+        document.getElementById('location').innerText = 'Overall India (Default)';
 
-        const ctx = document.getElementById('temperatureChart');
-        if (!ctx) return;
-
-        if (temperatureChartInstance) {
-            temperatureChartInstance.destroy();
-        }
-
-        Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
-        Chart.defaults.font.family = "'Poppins', sans-serif";
-
-        temperatureChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: dates,
-                datasets: [
-                    {
-                        label: 'Max Temp (°C)',
-                        data: maxTemps,
-                        borderColor: '#ef4444',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true
-                    },
-                    {
-                        label: 'Min Temp (°C)',
-                        data: minTemps,
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2,
-                        tension: 0.4,
-                        borderDash: [5, 5]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    }
-                },
-                scales: {
-                    y: {
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
-                        }
-                    },
-                    x: {
-                        grid: {
-                            color: 'rgba(255, 255, 255, 0.1)'
-                        }
-                    }
-                }
-            }
-        });
-    } catch (err) {
-        console.error("Error fetching chart data:", err);
+        // Mock default risk for India (could calculate it based on above data)
+        document.getElementById('flood-risk').innerText = '0.12';
+        document.getElementById('heat-risk').innerText = '0.85';
+      }
     }
 
-function getRecentSearches() {
-  return JSON.parse(localStorage.getItem(recentSearchStorageKey())) || [];
-}
-
-function recentSearchStorageKey() {
-  return `recentSearches_${localStorage.getItem("disasterShieldUserId") || "guest"}`;
-}
-
-function saveRecentSearch(city, state, country) {
-  if (!city || !state || !country) return;
-
-  const newSearch = {
-    city,
-    state,
-    country,
-  };
-
-  let searches = getRecentSearches();
-
-  searches = searches.filter(
-    (search) =>
-      !(
-        search.city.toLowerCase() === city.toLowerCase() &&
-        search.state.toLowerCase() === state.toLowerCase() &&
-        search.country.toLowerCase() === country.toLowerCase()
-      ),
-  );
-
-  searches.unshift(newSearch);
-  searches = searches.slice(0, 5);
-
-  localStorage.setItem(recentSearchStorageKey(), JSON.stringify(searches));
-
-  displayRecentSearches();
-}
-
-function displayRecentSearches() {
-  const container = document.getElementById("recent-search-list");
-
-  if (!container) return;
-
-  container.innerHTML = "";
-
-  const searches = getRecentSearches();
-
-  searches.forEach((search) => {
-    const button = document.createElement("button");
-
-    button.type = "button";
-    button.className = "search-chip";
-    button.innerText = search.city;
-
-    button.addEventListener("click", () => {
-      document.getElementById("city").value = search.city;
-      document.getElementById("state").value = search.state;
-      document.getElementById("country").value = search.country;
-
-      getWeatherData();
+    const dates = data.daily.time.map(d => {
+      const date = new Date(d);
+      return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     });
+    const maxTemps = data.daily.temperature_2m_max;
+    const minTemps = data.daily.temperature_2m_min;
 
-    container.appendChild(button);
-  });
-}
+    const ctx = document.getElementById('temperatureChart');
+    if (!ctx) return;
 
-document.addEventListener("DOMContentLoaded", () => {
-  displayRecentSearches();
+    if (temperatureChartInstance) {
+      temperatureChartInstance.destroy();
+    }
 
-  const toggleBtn = document.getElementById("toggle-history-btn");
-  const wrapper = document.getElementById("recent-search-wrapper");
-  const clearBtn = document.getElementById("clear-history-btn");
-  
-  if (toggleBtn && wrapper) {
-    toggleBtn.addEventListener("click", () => {
-      wrapper.classList.toggle("show-history");
+    Chart.defaults.color = 'rgba(255, 255, 255, 0.7)';
+    Chart.defaults.font.family = "'Poppins', sans-serif";
 
-      if (wrapper.classList.contains("show-history")) {
-        toggleBtn.innerText = "Recent Searches ▲";
-      } else {
-        toggleBtn.innerText = "Recent Searches ▼";
+    temperatureChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: dates,
+        datasets: [
+          {
+            label: 'Max Temp (°C)',
+            data: maxTemps,
+            borderColor: '#ef4444',
+            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+            borderWidth: 3,
+            tension: 0.4,
+            fill: true
+          },
+          {
+            label: 'Min Temp (°C)',
+            data: minTemps,
+            borderColor: '#3b82f6',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            tension: 0.4,
+            borderDash: [5, 5]
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            position: 'top',
+          }
+        },
+        scales: {
+          y: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            }
+          },
+          x: {
+            grid: {
+              color: 'rgba(255, 255, 255, 0.1)'
+            }
+          }
+        }
       }
     });
+  } catch (err) {
+    console.error("Error fetching chart data:", err);
   }
 
-  if (clearBtn) {
-    clearBtn.addEventListener("click", () => {
-      localStorage.removeItem(recentSearchStorageKey());
-      displayRecentSearches();
+  function getRecentSearches() {
+    return JSON.parse(localStorage.getItem(recentSearchStorageKey())) || [];
+  }
+
+  function recentSearchStorageKey() {
+    return `recentSearches_${localStorage.getItem("disasterShieldUserId") || "guest"}`;
+  }
+
+  function saveRecentSearch(city, state, country) {
+    if (!city || !state || !country) return;
+
+    const newSearch = {
+      city,
+      state,
+      country,
+    };
+
+    let searches = getRecentSearches();
+
+    searches = searches.filter(
+      (search) =>
+        !(
+          search.city.toLowerCase() === city.toLowerCase() &&
+          search.state.toLowerCase() === state.toLowerCase() &&
+          search.country.toLowerCase() === country.toLowerCase()
+        ),
+    );
+
+    searches.unshift(newSearch);
+    searches = searches.slice(0, 5);
+
+    localStorage.setItem(recentSearchStorageKey(), JSON.stringify(searches));
+
+    displayRecentSearches();
+  }
+
+  function displayRecentSearches() {
+    const container = document.getElementById("recent-search-list");
+
+    if (!container) return;
+
+    container.innerHTML = "";
+
+    const searches = getRecentSearches();
+
+    searches.forEach((search) => {
+      const button = document.createElement("button");
+
+      button.type = "button";
+      button.className = "search-chip";
+      button.innerText = search.city;
+
+      button.addEventListener("click", () => {
+        document.getElementById("city").value = search.city;
+        document.getElementById("state").value = search.state;
+        document.getElementById("country").value = search.country;
+
+        getWeatherData();
+      });
+
+      container.appendChild(button);
     });
   }
-});
+
+  document.addEventListener("DOMContentLoaded", () => {
+    displayRecentSearches();
+
+    const toggleBtn = document.getElementById("toggle-history-btn");
+    const wrapper = document.getElementById("recent-search-wrapper");
+    const clearBtn = document.getElementById("clear-history-btn");
+
+    if (toggleBtn && wrapper) {
+      toggleBtn.addEventListener("click", () => {
+        wrapper.classList.toggle("show-history");
+
+        if (wrapper.classList.contains("show-history")) {
+          toggleBtn.innerText = "Recent Searches ▲";
+        } else {
+          toggleBtn.innerText = "Recent Searches ▼";
+        }
+      });
+    }
+
+    if (clearBtn) {
+      clearBtn.addEventListener("click", () => {
+        localStorage.removeItem(recentSearchStorageKey());
+        displayRecentSearches();
+      });
+    }
+  });
 }
 
 // Theme toggle logic is handled globally by theme.js

@@ -446,20 +446,44 @@ def send_search_analysis_to_subscriber(email, report):
     if not email:
         return False
     with db_connect() as db:
-        subscriptions = db.execute("SELECT channels_json FROM subscriptions WHERE lower(email)=? AND active=1", (email,)).fetchall()
-    if not any("email" in json.loads(row["channels_json"] or "[]") for row in subscriptions):
+        subscriptions = db.execute(
+            "SELECT channels_json, telegram_chat_id FROM subscriptions WHERE lower(email)=? AND active=1",
+            (email,),
+        ).fetchall()
+    send_email = False
+    telegram_chat_ids = set()
+    for row in subscriptions:
+        channels = set(json.loads(row["channels_json"] or "[]"))
+        send_email = send_email or "email" in channels
+        chat_id = str(row["telegram_chat_id"] or "").strip()
+        if "telegram" in channels and chat_id:
+            telegram_chat_ids.add(chat_id)
+    if not send_email and not telegram_chat_ids:
         return False
     location = report.get("location", {})
     place = ", ".join(filter(None, (location.get("city"), location.get("state"))))
-    try:
-        _send_analysis_email(email, report, f"Disaster Shield analysis: {place}")
-        status, detail = "sent", ""
-    except Exception as error:
-        status, detail = "failed", str(error)[:500]
+    subject = f"Disaster Shield analysis: {place}"
+    details = []
+    sent_count = 0
+    attempt_count = int(send_email) + len(telegram_chat_ids)
+    if send_email:
+        try:
+            _send_analysis_email(email, report, subject)
+            sent_count += 1
+        except Exception as error:
+            details.append(f"email: {str(error)[:250]}")
+    telegram_body = f"{subject}\n\n{_analysis_text(report)}"
+    for chat_id in telegram_chat_ids:
+        try:
+            _telegram_send(chat_id, telegram_body)
+            sent_count += 1
+        except Exception as error:
+            details.append(f"telegram: {str(error)[:250]}")
+    status = "sent" if sent_count == attempt_count else "partial" if sent_count else "failed"
     with db_connect() as db:
         db.execute("INSERT INTO report_deliveries(email, location, kind, status, attempted_at, detail) VALUES (?, ?, 'search', ?, ?, ?)",
-                   (email, place, status, datetime.now(timezone.utc).isoformat(), detail))
-    return status == "sent"
+                   (email, place, status, datetime.now(timezone.utc).isoformat(), "; ".join(details)))
+    return sent_count > 0
 
 
 def fetch_subscription_analysis(district, state):
