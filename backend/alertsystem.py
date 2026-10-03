@@ -337,6 +337,12 @@ def get_weather_insights():
                 "message": "Please fill all fields."
             }), 400
 
+        normalized_city = "".join(character for character in city.casefold() if character.isalnum())
+        if normalized_city in {"demo", "demolocation"}:
+            report = fetch_subscription_analysis("DemoLocation", "Telangana")
+            send_search_analysis_to_subscriber(g.account["email"], report)
+            return jsonify(report)
+
         api_key = os.environ.get("OPENWEATHER_API_KEY")
 
         if not api_key:
@@ -831,9 +837,12 @@ def subscribe_to_notifications():
             failed = [channel for channel, result in confirmation.items() if not result["sent"]]
             analysis_sent = bool(report and confirmation.get("email", {}).get("sent"))
             if not failed and analysis_sent:
-                message = "Subscription saved. Your first location analysis was sent by email; email analyses will repeat every 5 days. Official warnings are sent as they arrive."
+                message = "Subscription saved. Your first location analysis was sent by email. Email analyses repeat every 5 days; selected Telegram receives five-day alerts when modeled risk is moderate or higher."
             elif not failed and "email" not in (data.get("channels") or []):
-                message = "Subscription saved. Email delivery is not selected, so location analyses and search reports are disabled."
+                if "telegram" in (data.get("channels") or []):
+                    message = "Subscription saved. Telegram analysis alerts will be sent on five-day checks when modeled risk is moderate or higher."
+                else:
+                    message = "Subscription saved. Email delivery is not selected, so email location analyses and search reports are disabled."
             elif not failed:
                 message = "Subscription saved. The first location analysis could not be sent yet and will be retried by the notification worker."
             elif sent:
@@ -879,6 +888,17 @@ def notification_status():
         "last_poll": last_poll(),
         "last_error": last_error(),
     })
+
+
+@app.route("/api/analysis-alert-sound", methods=["GET"])
+@login_required
+def analysis_alert_sound():
+    return send_from_directory(
+        os.path.dirname(os.path.abspath(__file__)),
+        "demo_alert.mpeg",
+        mimetype="audio/mpeg",
+        as_attachment=False,
+    )
 
 # =========================================================
 # CHATBOT API

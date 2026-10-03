@@ -4,6 +4,10 @@ const BACKEND_BASE_URL = window.location.port === "8080"
     ? `${window.location.protocol}//${window.location.hostname}:5000`
     : window.location.origin;
 const API_URL = `${BACKEND_BASE_URL}/weather`;
+let riskAlertAudioContext = null;
+let riskAlertAudioBufferPromise = null;
+let riskAlertAudioSource = null;
+let riskAlertPlaybackId = 0;
 
 // Global map and chart variables to prevent recreation bugs
 let mapInstance = null;
@@ -124,6 +128,73 @@ function getRiskLevel(score, riskType) {
   if (score <= 0.69) return { label: "High", cssClass: "high", desc: d.high };
   return { label: "Critical", cssClass: "critical", desc: d.critical };
 }
+
+function unlockRiskAlertAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  if (!riskAlertAudioContext) {
+    riskAlertAudioContext = new AudioContextClass();
+  }
+  if (riskAlertAudioContext.state === "suspended") {
+    riskAlertAudioContext.resume().catch((error) => {
+      console.warn("Risk alert audio context could not start:", error);
+    });
+  }
+}
+
+function stopRiskAlertSound() {
+  riskAlertPlaybackId += 1;
+  if (riskAlertAudioSource) {
+    riskAlertAudioSource.stop();
+    riskAlertAudioSource = null;
+  }
+  return riskAlertPlaybackId;
+}
+
+async function playRiskAlertSound(risks = {}, playbackId) {
+  const hasModerateOrHigherRisk = Object.entries(risks).some(
+    ([name, score]) => name.endsWith("_risk") && Number.isFinite(score) && score >= 0.3,
+  );
+  if (!hasModerateOrHigherRisk) return;
+
+  try {
+    unlockRiskAlertAudio();
+    if (!riskAlertAudioContext || !riskAlertAudioBufferPromise) {
+      if (!riskAlertAudioContext) {
+        throw new Error("Web Audio is unavailable in this browser");
+      }
+      riskAlertAudioBufferPromise = fetch(`${BACKEND_BASE_URL}/api/analysis-alert-sound`, {
+        credentials: "include",
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error(`Audio request failed (${response.status})`);
+          return response.arrayBuffer();
+        })
+        .then((audioData) => riskAlertAudioContext.decodeAudioData(audioData))
+        .catch((error) => {
+          riskAlertAudioBufferPromise = null;
+          throw error;
+        });
+    }
+    const audioBuffer = await riskAlertAudioBufferPromise;
+    if (riskAlertAudioContext.state === "suspended") {
+      await riskAlertAudioContext.resume();
+    }
+    if (playbackId !== riskAlertPlaybackId) return;
+    const source = riskAlertAudioContext.createBufferSource();
+    source.buffer = audioBuffer;
+    source.connect(riskAlertAudioContext.destination);
+    riskAlertAudioSource = source;
+    source.onended = () => {
+      if (riskAlertAudioSource === source) riskAlertAudioSource = null;
+    };
+    source.start();
+  } catch (error) {
+    console.warn("Risk alert sound could not play:", error);
+  }
+}
+
 function generateRecommendations(risks) {
   const recommendations = [];
 
@@ -275,9 +346,18 @@ async function loadNotificationLogs(district = "", state = "") {
 
 
 async function getWeatherData() {
+  const playbackId = stopRiskAlertSound();
   const city = document.getElementById("city").value.trim();
-  const state = document.getElementById("state").value.trim();
-  const country = document.getElementById("country").value.trim();
+  const normalizedCity = city.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const isDemoLocation = normalizedCity === "demo" || normalizedCity === "demolocation";
+  const stateInput = document.getElementById("state");
+  const countryInput = document.getElementById("country");
+  if (isDemoLocation) {
+    stateInput.value = "Telangana";
+    countryInput.value = "India";
+  }
+  const state = stateInput.value.trim();
+  const country = countryInput.value.trim();
   const districtSubscriptionInput = document.getElementById("subscribe-district");
   const stateSubscriptionInput = document.getElementById("subscribe-state");
   if (districtSubscriptionInput && !districtSubscriptionInput.value) districtSubscriptionInput.value = city;
@@ -310,6 +390,7 @@ async function getWeatherData() {
     return;
   }
 
+  unlockRiskAlertAudio();
   loading.classList.remove("hidden");
   analyzeBtn.disabled = true;
   analyzeBtn.textContent = "Analyzing...";
@@ -419,6 +500,9 @@ async function getWeatherData() {
     labelEl.textContent = level.label;
     labelEl.className = "risk-label " + level.cssClass;
     card.querySelector(".risk-description").textContent = level.desc;
+    if (isDemoLocation && data.demo_mode === true) {
+      playRiskAlertSound(data.risks, playbackId);
+    }
     const recommendationsPanel = document.getElementById(
       "recommendations-panel",
     );
@@ -478,6 +562,8 @@ async function getWeatherData() {
     } else {
       demoIndicator.classList.add("hidden");
     }
+    demoIndicator.classList.toggle("critical-demo-indicator", Boolean(data.demo_mode));
+    document.getElementById("demo-critical-banner").classList.toggle("hidden", !data.demo_mode);
 
     // Render Alerts
     let alertsHTML = "";
@@ -792,9 +878,12 @@ async function getWeatherData() {
       }, 150);
     });
 
-    resultStatus.innerText = "Climate analysis completed";
-    resultSummary.innerText =
-      "Live weather and risk analysis generated successfully.";
+    resultStatus.innerText = data.demo_mode
+      ? "Critical demo scenario"
+      : "Climate analysis completed";
+    resultSummary.innerText = data.demo_mode
+      ? "Synthetic heavy-rain scenario with critical modeled flood risk. Not a live forecast or official warning."
+      : "Live weather and risk analysis generated successfully.";
   } catch (error) {
     console.error(error);
     loading.classList.add("hidden");
@@ -924,6 +1013,8 @@ window.useCurrentLocation = async function () {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
+  displayRecentSearches();
+
   // Typewriter effect
   const typingTextElement = document.getElementById("hero-typing-text");
   if (typingTextElement) {
@@ -1101,96 +1192,51 @@ async function fetchAndRenderChart(lat, lon) {
   } catch (err) {
     console.error("Error fetching chart data:", err);
   }
+}
 
-  function getRecentSearches() {
-    return JSON.parse(localStorage.getItem(recentSearchStorageKey())) || [];
-  }
+function getRecentSearches() {
+  return JSON.parse(localStorage.getItem(recentSearchStorageKey())) || [];
+}
 
-  function recentSearchStorageKey() {
-    return `recentSearches_${localStorage.getItem("disasterShieldUserId") || "guest"}`;
-  }
+function recentSearchStorageKey() {
+  return `recentSearches_${localStorage.getItem("disasterShieldUserId") || "guest"}`;
+}
 
-  function saveRecentSearch(city, state, country) {
-    if (!city || !state || !country) return;
+function saveRecentSearch(city, state, country) {
+  if (!city || !state || !country) return;
 
-    const newSearch = {
-      city,
-      state,
-      country,
-    };
+  const newSearch = { city, state, country };
+  const searches = getRecentSearches().filter(
+    (search) =>
+      !(
+        search.city.toLowerCase() === city.toLowerCase() &&
+        search.state.toLowerCase() === state.toLowerCase() &&
+        search.country.toLowerCase() === country.toLowerCase()
+      ),
+  );
 
-    let searches = getRecentSearches();
+  searches.unshift(newSearch);
+  localStorage.setItem(recentSearchStorageKey(), JSON.stringify(searches.slice(0, 5)));
+  displayRecentSearches();
+}
 
-    searches = searches.filter(
-      (search) =>
-        !(
-          search.city.toLowerCase() === city.toLowerCase() &&
-          search.state.toLowerCase() === state.toLowerCase() &&
-          search.country.toLowerCase() === country.toLowerCase()
-        ),
-    );
+function displayRecentSearches() {
+  const container = document.getElementById("recent-search-list");
+  if (!container) return;
 
-    searches.unshift(newSearch);
-    searches = searches.slice(0, 5);
-
-    localStorage.setItem(recentSearchStorageKey(), JSON.stringify(searches));
-
-    displayRecentSearches();
-  }
-
-  function displayRecentSearches() {
-    const container = document.getElementById("recent-search-list");
-
-    if (!container) return;
-
-    container.innerHTML = "";
-
-    const searches = getRecentSearches();
-
-    searches.forEach((search) => {
-      const button = document.createElement("button");
-
-      button.type = "button";
-      button.className = "search-chip";
-      button.innerText = search.city;
-
-      button.addEventListener("click", () => {
-        document.getElementById("city").value = search.city;
-        document.getElementById("state").value = search.state;
-        document.getElementById("country").value = search.country;
-
-        getWeatherData();
-      });
-
-      container.appendChild(button);
+  container.replaceChildren();
+  getRecentSearches().forEach((search) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "search-chip";
+    button.textContent = search.city;
+    button.addEventListener("click", () => {
+      document.getElementById("city").value = search.city;
+      document.getElementById("state").value = search.state;
+      document.getElementById("country").value = search.country;
+      getWeatherData();
     });
-  }
-
-  document.addEventListener("DOMContentLoaded", () => {
-    displayRecentSearches();
-
-    const toggleBtn = document.getElementById("toggle-history-btn");
-    const wrapper = document.getElementById("recent-search-wrapper");
-    const clearBtn = document.getElementById("clear-history-btn");
-
-    if (toggleBtn && wrapper) {
-      toggleBtn.addEventListener("click", () => {
-        wrapper.classList.toggle("show-history");
-
-        if (wrapper.classList.contains("show-history")) {
-          toggleBtn.innerText = "Recent Searches ▲";
-        } else {
-          toggleBtn.innerText = "Recent Searches ▼";
-        }
-      });
-    }
-
-    if (clearBtn) {
-      clearBtn.addEventListener("click", () => {
-        localStorage.removeItem(recentSearchStorageKey());
-        displayRecentSearches();
-      });
-    }
+    container.appendChild(button);
   });
 }
 

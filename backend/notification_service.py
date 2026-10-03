@@ -133,7 +133,8 @@ def initialize_database():
         db.execute("""
             UPDATE subscriptions SET next_report_at=?
             WHERE active=1 AND next_report_at IS NULL AND report_attempts<5
-              AND channels_json LIKE '%"email"%'
+                            AND (channels_json LIKE '%"email"%' OR
+                                     (channels_json LIKE '%"telegram"%' AND telegram_chat_id IS NOT NULL AND telegram_chat_id!=''))
         """, (now,))
 
 
@@ -377,7 +378,8 @@ def create_subscription(data, user_id=None):
     if data.get("consent") is not True:
         raise ValueError("Consent is required to save this notification subscription.")
     now = datetime.now(timezone.utc).isoformat()
-    next_report_at = now if "email" in channels else None
+    wants_analysis_reports = "email" in channels or "telegram" in channels
+    next_report_at = now if wants_analysis_reports else None
     with db_connect() as db:
         inserted = db.execute("""
             INSERT INTO subscriptions(user_id, email, telegram_chat_id, district, state, categories_json, channels_json, consent_at, active, created_at, next_report_at)
@@ -394,7 +396,7 @@ def create_subscription(data, user_id=None):
                     report_attempts=CASE WHEN ? AND next_report_at IS NULL THEN 0 ELSE report_attempts END
                 WHERE id=?
             """, (user_id, telegram_chat_id, json.dumps(categories), json.dumps(channels), now,
-                  int("email" in channels), now, int("email" in channels), row["id"]))
+                  int(wants_analysis_reports), now, int(wants_analysis_reports), row["id"]))
         return row["id"], is_first_signup
 
 
@@ -406,6 +408,8 @@ def _analysis_text(report):
         f"Current conditions: {weather.get('temperature', 'N/A')} °C, humidity {weather.get('humidity', 'N/A')}%, "
         f"rainfall {weather.get('rainfall', 'N/A')} mm, wind {weather.get('wind_speed', 'N/A')} km/h.",
     ]
+    if report.get("demo_mode"):
+        lines.insert(0, "DEMO DATA ONLY: Synthetic scenario, not a live forecast or official warning.")
     if report.get("forecast_summary"):
         lines.extend(("", report["forecast_summary"]))
     risks = report.get("risks", {})
@@ -487,6 +491,71 @@ def send_search_analysis_to_subscriber(email, report):
 
 
 def fetch_subscription_analysis(district, state):
+    if _norm(district) == "demolocation" and _norm(state) == "telangana":
+        temperature = 29.0
+        humidity = 94.0
+        rainfall = 78.0
+        wind_speed = 24.0
+        risks = {
+            "flood_risk": round(min(1.0, (rainfall * 0.6 + humidity * 0.3 + wind_speed * 0.1) / 100), 3),
+            "heat_risk": round(min(1.0, (max(temperature - 25, 0) * 2 + humidity * 0.3) / 100), 3),
+            "wildfire_risk": round(min(1.0, (max(temperature - 32, 0) * 1.5 + (100 - humidity) * 0.5 + wind_speed * 0.2) / 100), 3),
+            "cyclone_risk": round(min(1.0, (wind_speed * 1.5 + rainfall * 0.5) / 100), 3),
+            "drought_risk": round(min(1.0, (max(temperature - 28, 0) + (100 - humidity)) / 100), 3),
+        }
+        for name, score in list(risks.items()):
+            risks[f"{name}_confidence"] = round(score * 100, 1)
+            risks[f"{name}_level"] = "HIGH" if score >= 0.6 else "MEDIUM" if score >= 0.3 else "LOW"
+
+        forecast = []
+        for day in range(7):
+            day_rainfall = 65 - day * 4
+            day_humidity = 92
+            day_wind = 24.0
+            day_temperature = 27.0
+            day_high = 30.0
+            day_risks = {
+                "flood_risk": round(min(1.0, (day_rainfall * 0.6 + day_humidity * 0.3 + day_wind * 0.1) / 100), 3),
+                "heat_risk": round(min(1.0, (max(day_high - 25, 0) * 2 + day_humidity * 0.3) / 100), 3),
+                "wildfire_risk": round(min(1.0, (max(day_high - 32, 0) * 1.5 + (100 - day_humidity) * 0.5 + day_wind * 0.2) / 100), 3),
+                "cyclone_risk": round(min(1.0, (day_wind * 1.5 + day_rainfall * 0.5) / 100), 3),
+                "drought_risk": round(min(1.0, (max(day_high - 28, 0) + (100 - day_humidity)) / 100), 3),
+            }
+            forecast.append({
+                "date": (datetime.now(timezone.utc).date() + timedelta(days=day)).isoformat(),
+                "temperature": day_temperature,
+                "temperature_min": 24.0,
+                "temperature_max": day_high,
+                "humidity": day_humidity,
+                "rainfall": day_rainfall,
+                "rain_probability": max(65, 90 - day * 3),
+                "wind_speed": day_wind,
+                "condition": "Rain showers",
+                "risks": day_risks,
+            })
+        return {
+            "success": True,
+            "location": {
+                "city": "DemoLocation",
+                "district": "Bhadradri Kothagudem",
+                "state": "Telangana",
+                "country": "India",
+                "latitude": 17.67,
+                "longitude": 80.89,
+            },
+            "weather": {
+                "temperature": temperature,
+                "humidity": humidity,
+                "rainfall": rainfall,
+                "wind_speed": wind_speed,
+            },
+            "risks": risks,
+            "forecast_summary": "DEMO ONLY: Heavy-rain scenario with critical modeled flood risk near Bhadrachalam, Telangana.",
+            "forecast": forecast,
+            "forecast_source": "Synthetic demo data",
+            "alerts": ["DEMO ONLY: Synthetic critical flood-risk scenario.", "Critical flood risk detected."],
+            "demo_mode": True,
+        }
     api_key = os.getenv("OPENWEATHER_API_KEY", "").strip()
     if not api_key:
         raise RuntimeError("Weather service is not configured")
@@ -540,7 +609,7 @@ def fetch_subscription_analysis(district, state):
     }
 
 
-def record_subscription_report_result(subscription_id, success, error=""):
+def record_subscription_report_result(subscription_id, success, error="", delivery_status=None):
     now = datetime.now(timezone.utc)
     with db_connect() as db:
         row = db.execute("SELECT email, district, state, report_attempts FROM subscriptions WHERE id=?", (subscription_id,)).fetchone()
@@ -550,8 +619,23 @@ def record_subscription_report_result(subscription_id, success, error=""):
         next_due = (now + timedelta(days=5)).isoformat() if success else (now + timedelta(minutes=15)).isoformat() if attempts < 5 else None
         db.execute("UPDATE subscriptions SET last_report_at=CASE WHEN ? THEN ? ELSE last_report_at END, next_report_at=?, report_attempts=? WHERE id=?",
                    (int(success), now.isoformat(), next_due, attempts, subscription_id))
+        status = delivery_status or ("sent" if success else "failed")
         db.execute("INSERT INTO report_deliveries(email, location, kind, status, attempted_at, detail) VALUES (?, ?, 'subscription', ?, ?, ?)",
-                   (row["email"], f"{row['district']}, {row['state']}", "sent" if success else "failed", now.isoformat(), error[:500]))
+                   (row["email"], f"{row['district']}, {row['state']}", status, now.isoformat(), error[:500]))
+
+
+def _moderate_or_higher_risk(report):
+    labels = {"flood_risk": "Flood", "heat_risk": "Heat", "wildfire_risk": "Wildfire", "cyclone_risk": "Cyclone"}
+    risks = report.get("risks", {})
+    available = [(float(value), labels.get(name, name.replace("_risk", "").title()))
+                 for name, value in risks.items() if name in labels]
+    if not available:
+        return None
+    score, hazard = max(available)
+    if score < 0.3:
+        return None
+    level = "HIGH" if score >= 0.6 else "MODERATE"
+    return f"{level} {hazard.upper()} RISK"
 
 
 def deliver_scheduled_analysis_reports():
@@ -559,12 +643,37 @@ def deliver_scheduled_analysis_reports():
     with db_connect() as db:
         rows = db.execute("SELECT * FROM subscriptions WHERE active=1 AND next_report_at IS NOT NULL AND next_report_at<=? AND report_attempts<5", (now,)).fetchall()
     for row in rows:
-        if "email" not in json.loads(row["channels_json"] or "[]"):
+        channels = set(json.loads(row["channels_json"] or "[]"))
+        send_email = "email" in channels
+        chat_id = str(row["telegram_chat_id"] or "").strip()
+        send_telegram = "telegram" in channels and bool(chat_id)
+        if not send_email and not send_telegram:
             continue
         try:
             report = fetch_subscription_analysis(row["district"], row["state"])
-            _send_analysis_email(row["email"], report, f"Your 5-day Disaster Shield analysis: {row['district']}, {row['state']}")
-            record_subscription_report_result(row["id"], True)
+            subject = f"Your 5-day Disaster Shield analysis: {row['district']}, {row['state']}"
+            delivered = []
+            errors = []
+            if send_email:
+                try:
+                    _send_analysis_email(row["email"], report, subject)
+                    delivered.append("email")
+                except Exception as error:
+                    errors.append(f"email: {str(error)[:200]}")
+            risk_alert = _moderate_or_higher_risk(report)
+            telegram_skipped = send_telegram and risk_alert is None
+            if send_telegram and risk_alert:
+                try:
+                    demo_prefix = "DEMO ONLY - " if report.get("demo_mode") else ""
+                    _telegram_send(chat_id, f"{demo_prefix}{risk_alert}\n{subject}\n\n{_analysis_text(report)}")
+                    delivered.append("telegram")
+                except Exception as error:
+                    errors.append(f"telegram: {str(error)[:200]}")
+            if errors and not delivered:
+                record_subscription_report_result(row["id"], False, "; ".join(errors), "failed")
+            else:
+                status = "partial" if errors else "skipped" if telegram_skipped and not delivered else "sent"
+                record_subscription_report_result(row["id"], True, "; ".join(errors), status)
         except Exception as error:
             record_subscription_report_result(row["id"], False, str(error))
 
@@ -646,7 +755,7 @@ def _telegram_send(chat_id, body):
         raise RuntimeError("Telegram bot is not configured")
     response = requests.post(
         f"https://api.telegram.org/bot{token}/sendMessage",
-        json={"chat_id": chat_id, "text": body}, timeout=20,
+        json={"chat_id": chat_id, "text": body, "disable_notification": False}, timeout=20,
     )
     response.raise_for_status()
     result = response.json()
